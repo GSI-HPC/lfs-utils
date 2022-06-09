@@ -14,7 +14,7 @@
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
 
@@ -30,6 +30,10 @@ from enum import Enum
 from lfs.version import lib_utils
 from lfs.version.minimal_python import MinimalPython
 
+
+class LFSUtilsError(Exception):
+    """Exception class LFSUtils specific errors."""
+    pass
 
 class LFSOstItem:
 
@@ -74,7 +78,7 @@ class LFSUtils:
         self.lfs_bin = lfs_bin
 
         if not os.path.isfile(self.lfs_bin):
-            raise RuntimeError(f"LFS binary was not found under: '{self.lfs_bin}'")
+            raise LFSUtilsError(f"LFS binary was not found under: '{self.lfs_bin}'")
 
     def version():
         return lib_utils.VERSION
@@ -82,37 +86,34 @@ class LFSUtils:
     # TODO: Return dict for multiple targets with proper OST items.
     def create_ost_item_list(self, target):
 
+        try:
+            args = ['sudo', self.lfs_bin, 'check', 'osts']
+            result = subprocess.run(args, check=True, capture_output=True)
+        except subprocess.CalledProcessError as err:
+            raise LFSUtilsError(err.stderr.decode('UTF-8'))
+
         ost_list = list()
 
-        try:
+        regex_str = target + r"\-(OST[a-z0-9]+)\-[a-z0-9-]+\s(.+)"
+        logging.debug("Using regex for `lfs check osts`: %s", regex_str)
+        pattern = re.compile(regex_str)
 
-            regex_str = target + r"\-(OST[a-z0-9]+)\-[a-z0-9-]+\s(.+)"
-            logging.debug("Using regex for `lfs check osts`: %s", regex_str)
-            pattern = re.compile(regex_str)
+        for line in result.stdout.decode('UTF-8').strip().split('\n'):
 
-            args = ['sudo', self.lfs_bin, 'check', 'osts']
+            match = pattern.match(line.strip())
 
-            result = subprocess.run(args, check=True, capture_output=True)
+            if match:
 
-            for line in result.stdout.decode('UTF-8').strip().split('\n'):
+                ost = match.group(1)
+                state = match.group(2)
 
-                match = pattern.match(line.strip())
-
-                if match:
-
-                    ost = match.group(1)
-                    state = match.group(2)
-
-                    if state == "active.":
-                        ost_list.append(LFSOstItem(target, ost, state, True))
-                    else:
-                        ost_list.append(LFSOstItem(target, ost, state, False))
-
+                if state == "active.":
+                    ost_list.append(LFSOstItem(target, ost, state, True))
                 else:
-                    logging.warning("No regex match for line: %s", line)
+                    ost_list.append(LFSOstItem(target, ost, state, False))
 
-        except subprocess.CalledProcessError as err:
-            raise RuntimeError(err.stderr.decode('UTF-8'))
+            else:
+                logging.warning("No regex match for line: %s", line)
 
         return ost_list
 
@@ -123,7 +124,7 @@ class LFSUtils:
             if ost_item.ost_idx == ost_idx:
                 return ost_item.active
 
-        raise RuntimeError(f"[LFSUtils::is_ost_idx_active] Index not found: {ost_idx}")
+        raise LFSUtilsError(f"Index not found: {ost_idx}")
 
     # TODO: Pass ost_idx as int, check is number and convert it to str.
     def set_stripe(self, ost_idx, file_path):
@@ -134,13 +135,13 @@ class LFSUtils:
             args = [self.lfs_bin, 'setstripe', '-i', ost_idx, file_path]
             subprocess.run(args, check=True, capture_output=True)
         except subprocess.CalledProcessError as err:
-            raise RuntimeError(err.stderr.decode('UTF-8'))
+            raise LFSUtilsError(err.stderr.decode('UTF-8'))
 
     def stripe_info(self, filename) -> StripeInfo:
         """
         Raises
         ------
-        RuntimeError
+        LFSUtilsError
             * If a field is not found in retrieved stripe info for given file.
             * If execution of 'lfs getstripe' returns an error.
 
@@ -153,7 +154,7 @@ class LFSUtils:
             args = [self.lfs_bin, 'getstripe', '-c', '-i', '-y', filename]
             result = subprocess.run(args, check=True, capture_output=True)
         except subprocess.CalledProcessError as err:
-            raise RuntimeError(err.stderr.decode('UTF-8'))
+            raise LFSUtilsError(err.stderr.decode('UTF-8'))
 
         # TODO: Write a test that checks on dict type and content...
         fields = yaml.safe_load(result.stdout)
@@ -162,21 +163,21 @@ class LFSUtils:
         if StripeField.LMM_STRIPE_COUNT in fields:
             lmm_stripe_count = fields[StripeField.LMM_STRIPE_COUNT]
         else:
-            raise RuntimeError(f"Field {StripeField.LMM_STRIPE_COUNT} not found in stripe info: {result.stdout}")
+            raise LFSUtilsError(f"Field {StripeField.LMM_STRIPE_COUNT} not found in stripe info: {result.stdout}")
 
         lmm_stripe_offset = 0
         if StripeField.LMM_STRIPE_OFFSET in fields:
             lmm_stripe_offset = fields[StripeField.LMM_STRIPE_OFFSET]
         else:
-            raise RuntimeError(f"Field {StripeField.LMM_STRIPE_OFFSET} not found in stripe info: {result.stdout}")
+            raise LFSUtilsError(f"Field {StripeField.LMM_STRIPE_OFFSET} not found in stripe info: {result.stdout}")
 
         return StripeInfo(lmm_stripe_count, lmm_stripe_offset)
 
-    def migrate_file(self, filename, source_idx=None, target_idx=-1, block=False, skip=True) -> None:
+    def migrate_file(self, filename, source_idx=None, target_idx=-1, block=False, skip=True) -> str:
         """
-        Processor function to process a file.
+        Migrates a file on Lustre.
 
-        Prints the following messages on STDOUT:
+        Returns a str with the following format:
             * IGNORED|{filename}
                 - if file has stripe index not equal source index
                 - if file has stripe index equal target index
@@ -189,27 +190,26 @@ class LFSUtils:
         """
 
         if not isinstance(filename, str):
-            raise RuntimeError('filename must be a str value.')
+            raise LFSUtilsError('filename must be a str value.')
         if source_idx is not None and not isinstance(source_idx, int):
-            raise RuntimeError('source_idx must be an int value.')
+            raise LFSUtilsError('source_idx must be an int value.')
         if not isinstance(target_idx, int):
-            raise RuntimeError('target_idx must be an int value.')
+            raise LFSUtilsError('target_idx must be an int value.')
         if block and not isinstance(block, bool):
-            raise RuntimeError('block must be a bool value.')
+            raise LFSUtilsError('block must be a bool value.')
         if skip and not isinstance(skip, bool):
-            raise RuntimeError('skip must be a bool value.')
-
+            raise LFSUtilsError('skip must be a bool value.')
         if not filename:
-            raise RuntimeError('Empty filename provided.')
+            raise LFSUtilsError('Empty filename provided.')
 
         stripe_info = self.stripe_info(filename)
 
         if skip and stripe_info.count > 1:
-            logging.info("SKIPPED|%s", filename)
+            return f"SKIPPED|{filename}"
         elif source_idx is not None and stripe_info.index != source_idx:
-            logging.info("IGNORED|%s", filename)
+            return f"IGNORED|{filename}"
         elif target_idx is not None and stripe_info.index == target_idx:
-            logging.info("IGNORED|%s", filename)
+            return f"IGNORED|{filename}"
         else:
 
             try:
@@ -234,7 +234,7 @@ class LFSUtils:
                 subprocess.run(args, check=True, capture_output=True)
                 elapsed_time = datetime.now() - start_time
 
-                logging.info("SUCCESS|%s|%i|%i|%s", filename, stripe_info.index, target_idx, elapsed_time)
+                return f"SUCCESS|{filename}|{stripe_info.index}|{target_idx}|{elapsed_time}"
 
             except subprocess.CalledProcessError as err:
 
@@ -243,18 +243,18 @@ class LFSUtils:
                 if err.stderr:
                     stderr = err.stderr.decode('UTF-8')
 
-                logging.info("FAILED|%s|%s|%s", filename, err.returncode, stderr)
+                return f"FAILED|{filename}|{err.returncode}|{stderr}"
 
     def retrieve_ost_fill_level(self, fs_path):
 
         if not fs_path:
-            raise RuntimeError("Lustre file system path is not set!")
+            raise LFSUtilsError("Lustre file system path is not set!")
 
         try:
             args = ['sudo', self.lfs_bin, 'df', fs_path]
             result = subprocess.run(args, check=True, capture_output=True)
         except subprocess.CalledProcessError as err:
-            raise RuntimeError(err.stderr.decode('UTF-8'))
+            raise LFSUtilsError(err.stderr.decode('UTF-8'))
 
         # TODO: Use as class variable.
         regex = r"(\d{1,3})%.*\[OST:([0-9]{1,4})\]"
@@ -274,6 +274,6 @@ class LFSUtils:
                 ost_fill_level_dict[ost_idx] = fill_level
 
         if not ost_fill_level_dict:
-            raise RuntimeError("Lustre OST fill levels are empty!")
+            raise LFSUtilsError("Lustre OST fill levels are empty!")
 
         return ost_fill_level_dict

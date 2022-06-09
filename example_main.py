@@ -23,7 +23,7 @@ import logging
 import sys
 import os
 
-from lfs.lfs_utils import LFSUtils
+from lfs.lfs_utils import LFSUtils, LFSUtilsError
 
 
 def init_arg_parser():
@@ -83,31 +83,45 @@ def main():
 
         logging.info("Started")
 
-        ost_item_list = lfs_utils.create_ost_item_list('hebe')
-        logging.info(f"Size of OSTItem list: {len(ost_item_list)}")
+        try:
+            logging.info(f"Size of OSTItem list: {len(lfs_utils.create_ost_item_list('hebe'))}")
+        except LFSUtilsError as err:
+            logging.error(err)
 
-        ost_active = lfs_utils.is_ost_idx_active('hebe', '0')
-        logging.info(f"OST 0 is active: {ost_active}")
+        try:
+            logging.info(f"OST 0 is active: {lfs_utils.is_ost_idx_active('hebe', '0')}")
+        except LFSUtilsError as err:
+            logging.error(err)
 
         test_file = '/lustre/hebe/hpc/iannetti/test_set_stripe.tmp'
 
-        lfs_utils.set_stripe('0', test_file)
+        try:
+            lfs_utils.set_stripe('0', test_file)
+        except LFSUtilsError as err:
+            logging.error(err)
 
-        stripe_info = lfs_utils.stripe_info(test_file)
-        logging.info(stripe_info)
+        try:
+            logging.info(lfs_utils.stripe_info(test_file))
+        except LFSUtilsError as err:
+            logging.error(err)
 
-        lfs_utils.migrate_file(test_file, 0, 1)
+        try:
+            logging.info(lfs_utils.migrate_file(test_file, 0, 1))
+        except LFSUtilsError as err:
+            logging.error(err)
 
-        ost_fill_level = lfs_utils.retrieve_ost_fill_level('/lustre')
-        logging.info(ost_fill_level)
+        try:
+            logging.info(f"Size of OST fill level items: {len(lfs_utils.retrieve_ost_fill_level('/lustre'))}")
+        except LFSUtilsError as err:
+            logging.error(err)
+
+        logging.info("Finished")
 
     except Exception as err:
 
         _, _, exc_tb = sys.exc_info()
         filename = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
         logging.error(f"Exception in {filename} (line: {exc_tb.tb_lineno}): {err}")
-
-    logging.info("Finished")
 
 
 if __name__ == '__main__':

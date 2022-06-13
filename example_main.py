@@ -19,11 +19,12 @@
 
 
 import argparse
+import datetime
 import logging
 import sys
 import os
 
-from lfs.lfs_utils import LFSUtils, LFSUtilsError
+from lfs.lfs_utils import LFSUtils, LFSUtilsError, MigrateResult, MigrateState
 
 
 def init_arg_parser():
@@ -72,6 +73,9 @@ def main():
     try:
 
         args = init_arg_parser()
+
+        migrate_result = MigrateResult(MigrateState.SUCCESS, 'tmp/whatever.tmp', datetime.timedelta(0))
+        logging.info(migrate_result)
 
         lfs_utils = LFSUtils('/usr/bin/lfs')
 

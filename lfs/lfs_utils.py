@@ -24,12 +24,17 @@ import yaml
 import logging
 import subprocess
 
-from datetime import datetime
 from enum import Enum
+from datetime import datetime, timedelta
 
-from lfs.version import lib_utils
+from lfs.version import library
 from lfs.version.minimal_python import MinimalPython
 
+
+def check_argument_for_type(arg, t):
+
+    if arg and not isinstance(arg, t):
+        raise RuntimeError(f"Argument must be type of {t}.")
 
 class LFSUtilsError(Exception):
     """Exception class LFSUtils specific errors."""
@@ -65,8 +70,72 @@ class StripeField(str, Enum):
 class StripeInfo:
 
     def __init__(self, count, index):
+
         self.count = count
         self.index = index
+
+class MigrateState(str, Enum):
+
+        IGNORED = 'IGNORED'
+        SKIPPED = 'SKIPPED'
+        SUCCESS = 'SUCCESS'
+        FAILED  = 'FAILED'
+
+class MigrateResult:
+    '''
+    * IGNORED|{filename}
+        - if file has stripe index not equal source index
+        - if file has stripe index equal target index
+    * SKIPPED|{filename}
+        - if skip option enabled and file stripe count > 1
+    * SUCCESS|{filename}|{ost_source_index}|{ost_target_index}|{time_elapsed}
+        - if migration of file was successful
+    * FAILED|{filename}|{return_code}|{error_message}
+        - if migration of file failed
+    '''
+
+    def __init__(self, state, filename, time_elapsed, source_idx=None, target_idx=None, error_code=None, error_msg=None):
+
+        check_argument_for_type(state, MigrateState)
+        check_argument_for_type(filename, str)
+        check_argument_for_type(time_elapsed, timedelta)
+        check_argument_for_type(source_idx, int)
+        check_argument_for_type(target_idx, int)
+        check_argument_for_type(error_code, str)
+        check_argument_for_type(error_msg, str)
+
+        if not filename:
+            raise RuntimeError('No filename set.')
+
+        if time_elapsed is None:
+            raise RuntimeError('No time_elapsed set.')
+
+        if state == MigrateState.FAILED:
+            if not error_code:
+                raise RuntimeError('State MigrateState.FAILED requires error_code to be set.')
+            if not error_msg:
+                raise RuntimeError('State MigrateState.FAILED requires error_msg to be set.')
+
+        self.state = state
+        self.filename = filename
+        self.source_idx = source_idx
+        self.target_idx = target_idx
+        self.time_elapsed = time_elapsed
+        self.error_code = error_code
+        self.error_msg = error_msg
+
+    def __str__(self) -> str:
+
+        out = f"{self.state}|{self.filename}|{self.time_elapsed}"
+
+        if self.state == (MigrateState.IGNORED or MigrateState.SKIPPED):
+            out += f"|{self.source_idx}|{self.target_idx}"
+        if self.state == MigrateState.SUCCESS:
+            out += f"|{self.source_idx}|{self.target_idx}"
+        if self.state == MigrateState.FAILED:
+            out += f"|{self.error_code}|{self.error_msg}"
+
+        return out
 
 # TODO: Make Singleton...?
 class LFSUtils:
@@ -81,7 +150,7 @@ class LFSUtils:
             raise LFSUtilsError(f"LFS binary was not found under: '{self.lfs_bin}'")
 
     def version():
-        return lib_utils.VERSION
+        return library.VERSION
 
     # TODO: Return dict for multiple targets with proper OST items.
     def create_ost_item_list(self, target):
@@ -174,20 +243,6 @@ class LFSUtils:
         return StripeInfo(lmm_stripe_count, lmm_stripe_offset)
 
     def migrate_file(self, filename, source_idx=None, target_idx=-1, block=False, skip=True) -> str:
-        """
-        Migrates a file on Lustre.
-
-        Returns a str with the following format:
-            * IGNORED|{filename}
-                - if file has stripe index not equal source index
-                - if file has stripe index equal target index
-            * SKIPPED|{filename}
-                - if skip option enabled and file stripe count > 1
-            * SUCCESS|{filename}|{ost_source_index}|{ost_target_index}|{time_time_elapsed}
-                - if migration of file was successful
-            * FAILED|{filename}|{return_code}|{error_message}
-                - if migration of file failed
-        """
 
         if not isinstance(filename, str):
             raise LFSUtilsError('filename must be a str value.')
@@ -205,11 +260,11 @@ class LFSUtils:
         stripe_info = self.stripe_info(filename)
 
         if skip and stripe_info.count > 1:
-            return f"SKIPPED|{filename}"
+            return MigrateResult(MigrateState.IGNORED, filename, timedelta(0))
         elif source_idx is not None and stripe_info.index != source_idx:
-            return f"IGNORED|{filename}"
+            return MigrateResult(MigrateState.IGNORED, filename, timedelta(0))
         elif target_idx is not None and stripe_info.index == target_idx:
-            return f"IGNORED|{filename}"
+            return MigrateResult(MigrateState.IGNORED, filename, timedelta(0))
         else:
 
             try:
@@ -232,9 +287,9 @@ class LFSUtils:
 
                 start_time = datetime.now()
                 subprocess.run(args, check=True, capture_output=True)
-                elapsed_time = datetime.now() - start_time
+                time_elapsed = datetime.now() - start_time
 
-                return f"SUCCESS|{filename}|{stripe_info.index}|{target_idx}|{elapsed_time}"
+                return MigrateResult(MigrateState.SUCCESS, filename, time_elapsed, source_idx=stripe_info.index, target_idx=target_idx)
 
             except subprocess.CalledProcessError as err:
 
@@ -243,7 +298,7 @@ class LFSUtils:
                 if err.stderr:
                     stderr = err.stderr.decode('UTF-8')
 
-                return f"FAILED|{filename}|{err.returncode}|{stderr}"
+                return MigrateResult(MigrateState.FAILED, filename, time_elapsed, error_code=err.returncode, error_msg=stderr)
 
     def retrieve_ost_fill_level(self, fs_path):
 

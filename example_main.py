@@ -19,12 +19,12 @@
 
 
 import argparse
-import datetime
 import logging
 import sys
 import os
 
-from lfs.lfs_utils import LfsUtils, LfsUtilsError, MigrateResult, MigrateState
+from minimal_python import MinimalPython
+from lfs.lfs_utils import LfsUtils, LfsUtilsError
 
 
 def init_arg_parser():
@@ -71,6 +71,8 @@ def init_logging(log_file, enable_debug):
 def main():
 
     try:
+
+        MinimalPython.check()
 
         args = init_arg_parser()
 

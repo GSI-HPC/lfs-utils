@@ -27,9 +27,6 @@ import subprocess
 from enum import Enum
 from datetime import datetime, timedelta
 
-from lfs.version import library
-from lfs.version.minimal_python import MinimalPython
-
 
 def check_argument_for_type(arg, t):
 
@@ -143,15 +140,10 @@ class LfsUtils:
 
     def __init__(self, lfs_bin):
 
-        MinimalPython.check()
-
         self.lfs_bin = lfs_bin
 
         if not os.path.isfile(self.lfs_bin):
             raise LfsUtilsError(f"LFS binary was not found under: '{self.lfs_bin}'")
-
-    def version():
-        return library.VERSION
 
     # TODO: Return dict for multiple targets with proper OST items.
     def create_ost_item_list(self, target):

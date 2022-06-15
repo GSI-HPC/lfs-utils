@@ -24,12 +24,12 @@ import logging
 import sys
 import os
 
-from lfs.lfs_utils import LFSUtils, LFSUtilsError, MigrateResult, MigrateState
+from lfs.lfs_utils import LfsUtils, LfsUtilsError, MigrateResult, MigrateState
 
 
 def init_arg_parser():
 
-    parser = argparse.ArgumentParser(description='Example main programm for executing LFSUtils.')
+    parser = argparse.ArgumentParser(description='Example main programm for executing LfsUtils.')
 
     parser.add_argument('-l',
                         '--log-file',
@@ -74,10 +74,7 @@ def main():
 
         args = init_arg_parser()
 
-        migrate_result = MigrateResult(MigrateState.SUCCESS, 'tmp/whatever.tmp', datetime.timedelta(0))
-        logging.info(migrate_result)
-
-        lfs_utils = LFSUtils('/usr/bin/lfs')
+        lfs_utils = LfsUtils('/usr/bin/lfs')
 
         if args.print_version:
             print(f"{lfs_utils.version()}")
@@ -85,41 +82,42 @@ def main():
 
         init_logging(args.log_file, args.enable_debug)
 
-        logging.info("Started")
+        logging.info('Started')
 
         try:
             logging.info(f"Size of OSTItem list: {len(lfs_utils.create_ost_item_list('hebe'))}")
-        except LFSUtilsError as err:
+        except LfsUtilsError as err:
             logging.error(err)
 
         try:
-            logging.info(f"OST 0 is active: {lfs_utils.is_ost_idx_active('hebe', '0')}")
-        except LFSUtilsError as err:
+            logging.info(f"Is OST 0 active: {lfs_utils.is_ost_idx_active('hebe', 0)}")
+        except LfsUtilsError as err:
             logging.error(err)
 
         test_file = '/lustre/hebe/hpc/iannetti/test_set_stripe.tmp'
 
         try:
-            lfs_utils.set_stripe('0', test_file)
-        except LFSUtilsError as err:
+            lfs_utils.set_stripe(0, test_file)
+        except LfsUtilsError as err:
             logging.error(err)
 
         try:
-            logging.info(lfs_utils.stripe_info(test_file))
-        except LFSUtilsError as err:
+            stripe_info = lfs_utils.stripe_info(test_file)
+            logging.info(f"Stripe info for file: {stripe_info.filename} - OST index: {stripe_info.index} - Stripe count: {stripe_info.count}")
+        except LfsUtilsError as err:
             logging.error(err)
 
         try:
             logging.info(lfs_utils.migrate_file(test_file, 0, 1))
-        except LFSUtilsError as err:
+        except LfsUtilsError as err:
             logging.error(err)
 
         try:
             logging.info(f"Size of OST fill level items: {len(lfs_utils.retrieve_ost_fill_level('/lustre'))}")
-        except LFSUtilsError as err:
+        except LfsUtilsError as err:
             logging.error(err)
 
-        logging.info("Finished")
+        logging.info('Finished')
 
     except Exception as err:
 

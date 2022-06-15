@@ -36,11 +36,11 @@ def check_argument_for_type(arg, t):
     if arg and not isinstance(arg, t):
         raise RuntimeError(f"Argument must be type of {t}.")
 
-class LFSUtilsError(Exception):
-    """Exception class LFSUtils specific errors."""
+class LfsUtilsError(Exception):
+    """Exception class LfsUtils specific errors."""
     pass
 
-class LFSOstItem:
+class LfsOstItem:
 
     def __init__(self, target, ost, state, active):
 
@@ -60,7 +60,7 @@ class LFSOstItem:
         if ost[0:3] != 'OST':
             raise RuntimeError(f"OST word not found in argument: {ost}")
 
-        self._ost_idx = str(int(ost[3:], 16))
+        self._ost_idx = int(ost[3:], 16)
 
 class StripeField(str, Enum):
 
@@ -69,8 +69,9 @@ class StripeField(str, Enum):
 
 class StripeInfo:
 
-    def __init__(self, count, index):
+    def __init__(self, filename, count, index):
 
+        self.filename = filename
         self.count = count
         self.index = index
 
@@ -101,7 +102,7 @@ class MigrateResult:
         check_argument_for_type(time_elapsed, timedelta)
         check_argument_for_type(source_idx, int)
         check_argument_for_type(target_idx, int)
-        check_argument_for_type(error_code, str)
+        check_argument_for_type(error_code, int)
         check_argument_for_type(error_msg, str)
 
         if not filename:
@@ -112,9 +113,14 @@ class MigrateResult:
 
         if state == MigrateState.FAILED:
             if not error_code:
-                raise RuntimeError('State MigrateState.FAILED requires error_code to be set.')
+                raise RuntimeError('State FAILED requires error_code to be set.')
             if not error_msg:
-                raise RuntimeError('State MigrateState.FAILED requires error_msg to be set.')
+                raise RuntimeError('State FAILED requires error_msg to be set.')
+        else:
+            if error_code:
+                raise RuntimeError(f"Not allowed to set error_code in state {state}.")
+            if error_msg:
+                raise RuntimeError(f"Not allowed to set error_msg in state {state}.")
 
         self.state = state
         self.filename = filename
@@ -126,19 +132,14 @@ class MigrateResult:
 
     def __str__(self) -> str:
 
-        out = f"{self.state}|{self.filename}|{self.time_elapsed}"
+        return f"{self.state}|{self.filename}|{self.time_elapsed}|{self.source_idx}|{self.target_idx}|{self.error_code}|{self.error_msg}"
 
-        if self.state == (MigrateState.IGNORED or MigrateState.SKIPPED):
-            out += f"|{self.source_idx}|{self.target_idx}"
-        if self.state == MigrateState.SUCCESS:
-            out += f"|{self.source_idx}|{self.target_idx}"
-        if self.state == MigrateState.FAILED:
-            out += f"|{self.error_code}|{self.error_msg}"
+class LfsUtils:
 
-        return out
+    _REGEX_STR_OST_STATE = r"\-(OST[a-z0-9]+)\-[a-z0-9-]+\s(.+)"
+    _REGEX_STR_OST_FILL_LEVEL = r"(\d{1,3})%.*\[OST:([0-9]{1,4})\]"
 
-# TODO: Make Singleton...?
-class LFSUtils:
+    _REGEX_PATTERN_OST_FILL_LEVEL = re.compile(_REGEX_STR_OST_FILL_LEVEL)
 
     def __init__(self, lfs_bin):
 
@@ -147,7 +148,7 @@ class LFSUtils:
         self.lfs_bin = lfs_bin
 
         if not os.path.isfile(self.lfs_bin):
-            raise LFSUtilsError(f"LFS binary was not found under: '{self.lfs_bin}'")
+            raise LfsUtilsError(f"LFS binary was not found under: '{self.lfs_bin}'")
 
     def version():
         return library.VERSION
@@ -159,11 +160,11 @@ class LFSUtils:
             args = ['sudo', self.lfs_bin, 'check', 'osts']
             result = subprocess.run(args, check=True, capture_output=True)
         except subprocess.CalledProcessError as err:
-            raise LFSUtilsError(err.stderr.decode('UTF-8'))
+            raise LfsUtilsError(err.stderr.decode('UTF-8'))
 
         ost_list = list()
 
-        regex_str = target + r"\-(OST[a-z0-9]+)\-[a-z0-9-]+\s(.+)"
+        regex_str = target + LfsUtils._REGEX_STR_OST_STATE
         logging.debug("Using regex for `lfs check osts`: %s", regex_str)
         pattern = re.compile(regex_str)
 
@@ -177,9 +178,9 @@ class LFSUtils:
                 state = match.group(2)
 
                 if state == "active.":
-                    ost_list.append(LFSOstItem(target, ost, state, True))
+                    ost_list.append(LfsOstItem(target, ost, state, True))
                 else:
-                    ost_list.append(LFSOstItem(target, ost, state, False))
+                    ost_list.append(LfsOstItem(target, ost, state, False))
 
             else:
                 logging.warning("No regex match for line: %s", line)
@@ -193,24 +194,35 @@ class LFSUtils:
             if ost_item.ost_idx == ost_idx:
                 return ost_item.active
 
-        raise LFSUtilsError(f"Index not found: {ost_idx}")
+        raise LfsUtilsError(f"Index not found: {ost_idx}")
 
-    # TODO: Pass ost_idx as int, check is number and convert it to str.
     def set_stripe(self, ost_idx, file_path):
 
-        logging.debug("Setting stripe for file: %s - OST: %s", file_path, ost_idx)
+        if ost_idx is None:
+            raise RuntimeError('Argument ost_idx is not set.')
+
+        if file_path is None or not file_path:
+            raise RuntimeError('Argument file_path is not set.')
+
+        if not isinstance(ost_idx, int):
+            raise RuntimeError('Argument ost_idx must be type int.')
+
+        if not isinstance(file_path, str):
+            raise RuntimeError('Argument file_path must be type str.')
+
+        logging.debug("Setting stripe for file: %s - OST: %i", file_path, ost_idx)
 
         try:
-            args = [self.lfs_bin, 'setstripe', '-i', ost_idx, file_path]
+            args = [self.lfs_bin, 'setstripe', '-i', str(ost_idx), file_path]
             subprocess.run(args, check=True, capture_output=True)
         except subprocess.CalledProcessError as err:
-            raise LFSUtilsError(err.stderr.decode('UTF-8'))
+            raise LfsUtilsError(err.stderr.decode('UTF-8'))
 
     def stripe_info(self, filename) -> StripeInfo:
         """
         Raises
         ------
-        LFSUtilsError
+        LfsUtilsError
             * If a field is not found in retrieved stripe info for given file.
             * If execution of 'lfs getstripe' returns an error.
 
@@ -223,7 +235,7 @@ class LFSUtils:
             args = [self.lfs_bin, 'getstripe', '-c', '-i', '-y', filename]
             result = subprocess.run(args, check=True, capture_output=True)
         except subprocess.CalledProcessError as err:
-            raise LFSUtilsError(err.stderr.decode('UTF-8'))
+            raise LfsUtilsError(err.stderr.decode('UTF-8'))
 
         # TODO: Write a test that checks on dict type and content...
         fields = yaml.safe_load(result.stdout)
@@ -232,39 +244,39 @@ class LFSUtils:
         if StripeField.LMM_STRIPE_COUNT in fields:
             lmm_stripe_count = fields[StripeField.LMM_STRIPE_COUNT]
         else:
-            raise LFSUtilsError(f"Field {StripeField.LMM_STRIPE_COUNT} not found in stripe info: {result.stdout}")
+            raise LfsUtilsError(f"Field {StripeField.LMM_STRIPE_COUNT} not found in stripe info: {result.stdout}")
 
         lmm_stripe_offset = 0
         if StripeField.LMM_STRIPE_OFFSET in fields:
             lmm_stripe_offset = fields[StripeField.LMM_STRIPE_OFFSET]
         else:
-            raise LFSUtilsError(f"Field {StripeField.LMM_STRIPE_OFFSET} not found in stripe info: {result.stdout}")
+            raise LfsUtilsError(f"Field {StripeField.LMM_STRIPE_OFFSET} not found in stripe info: {result.stdout}")
 
-        return StripeInfo(lmm_stripe_count, lmm_stripe_offset)
+        return StripeInfo(filename, lmm_stripe_count, lmm_stripe_offset)
 
-    def migrate_file(self, filename, source_idx=None, target_idx=-1, block=False, skip=True) -> str:
+    def migrate_file(self, filename, source_idx=None, target_idx=None, block=False, skip=True) -> str:
 
         if not isinstance(filename, str):
-            raise LFSUtilsError('filename must be a str value.')
+            raise LfsUtilsError('filename must be a str value.')
         if source_idx is not None and not isinstance(source_idx, int):
-            raise LFSUtilsError('source_idx must be an int value.')
-        if not isinstance(target_idx, int):
-            raise LFSUtilsError('target_idx must be an int value.')
+            raise LfsUtilsError('source_idx must be an int value.')
+        if target_idx is not None and not isinstance(target_idx, int):
+            raise LfsUtilsError('target_idx must be an int value.')
         if block and not isinstance(block, bool):
-            raise LFSUtilsError('block must be a bool value.')
+            raise LfsUtilsError('block must be a bool value.')
         if skip and not isinstance(skip, bool):
-            raise LFSUtilsError('skip must be a bool value.')
+            raise LfsUtilsError('skip must be a bool value.')
         if not filename:
-            raise LFSUtilsError('Empty filename provided.')
+            raise LfsUtilsError('Empty filename provided.')
 
         stripe_info = self.stripe_info(filename)
 
         if skip and stripe_info.count > 1:
-            return MigrateResult(MigrateState.IGNORED, filename, timedelta(0))
+            return MigrateResult(MigrateState.SKIPPED, filename, timedelta(0), source_idx, target_idx)
         elif source_idx is not None and stripe_info.index != source_idx:
-            return MigrateResult(MigrateState.IGNORED, filename, timedelta(0))
+            return MigrateResult(MigrateState.IGNORED, filename, timedelta(0), source_idx, target_idx)
         elif target_idx is not None and stripe_info.index == target_idx:
-            return MigrateResult(MigrateState.IGNORED, filename, timedelta(0))
+            return MigrateResult(MigrateState.IGNORED, filename, timedelta(0), source_idx, target_idx)
         else:
 
             try:
@@ -289,7 +301,7 @@ class LFSUtils:
                 subprocess.run(args, check=True, capture_output=True)
                 time_elapsed = datetime.now() - start_time
 
-                return MigrateResult(MigrateState.SUCCESS, filename, time_elapsed, source_idx=stripe_info.index, target_idx=target_idx)
+                return MigrateResult(MigrateState.SUCCESS, filename, time_elapsed, source_idx, target_idx)
 
             except subprocess.CalledProcessError as err:
 
@@ -298,28 +310,24 @@ class LFSUtils:
                 if err.stderr:
                     stderr = err.stderr.decode('UTF-8')
 
-                return MigrateResult(MigrateState.FAILED, filename, time_elapsed, error_code=err.returncode, error_msg=stderr)
+                return MigrateResult(MigrateState.FAILED, filename, time_elapsed, source_idx, target_idx, err.returncode, stderr)
 
     def retrieve_ost_fill_level(self, fs_path):
 
         if not fs_path:
-            raise LFSUtilsError("Lustre file system path is not set!")
+            raise LfsUtilsError('Lustre file system path is not set!')
 
         try:
             args = ['sudo', self.lfs_bin, 'df', fs_path]
             result = subprocess.run(args, check=True, capture_output=True)
         except subprocess.CalledProcessError as err:
-            raise LFSUtilsError(err.stderr.decode('UTF-8'))
-
-        # TODO: Use as class variable.
-        regex = r"(\d{1,3})%.*\[OST:([0-9]{1,4})\]"
-        pattern = re.compile(regex)
+            raise LfsUtilsError(err.stderr.decode('UTF-8'))
 
         ost_fill_level_dict = dict()
 
         for line in result.stdout.decode('UTF-8').strip().split('\n'):
 
-            match = pattern.search(line.strip())
+            match = LfsUtils._REGEX_PATTERN_OST_FILL_LEVEL.search(line.strip())
 
             if match:
 
@@ -329,6 +337,6 @@ class LFSUtils:
                 ost_fill_level_dict[ost_idx] = fill_level
 
         if not ost_fill_level_dict:
-            raise LFSUtilsError("Lustre OST fill levels are empty!")
+            raise LfsUtilsError('Lustre OST fill levels are empty!')
 
         return ost_fill_level_dict

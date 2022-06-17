@@ -17,26 +17,28 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import pstats
 import unittest
 
-from datetime import datetime, timedelta
-
+from datetime import timedelta
 from lfs.lfs_utils import MigrateResult, MigrateState
 
 
 class TestLfsUtils(unittest.TestCase):
 
-    def create_migrate_result_with_no_filename(self, state):
+    @classmethod
+    def create_migrate_result_with_no_filename(cls, state):
         MigrateResult(state, '', timedelta(0))
 
-    def create_migrate_result_with_no_time_elapsed(self, state):
+    @classmethod
+    def create_migrate_result_with_no_time_elapsed(cls, state):
         MigrateResult(state, 'test.tmp', None)
 
-    def create_migrate_result_with_just_error_code(self, state):
+    @classmethod
+    def create_migrate_result_with_just_error_code(cls, state):
         MigrateResult(state, 'test.tmp', timedelta(0), error_code=12)
 
-    def create_migrate_result_with_just_error_msg(self, state):
+    @classmethod
+    def create_migrate_result_with_just_error_msg(cls, state):
         MigrateResult(state, 'test.tmp', timedelta(0), error_msg='An error occured.')
 
     def test_migrate_result_ignored(self):
@@ -48,16 +50,16 @@ class TestLfsUtils(unittest.TestCase):
         self.assertEqual(result.__str__(), 'IGNORED|test.tmp|0:01:13|4|67|None|None')
 
         with self.assertRaises(RuntimeError):
-            self.create_migrate_result_with_no_filename(MigrateState.IGNORED)
+            TestLfsUtils.create_migrate_result_with_no_filename(MigrateState.IGNORED)
 
         with self.assertRaises(RuntimeError):
-            self.create_migrate_result_with_no_time_elapsed(MigrateState.IGNORED)
+            TestLfsUtils.create_migrate_result_with_no_time_elapsed(MigrateState.IGNORED)
 
         with self.assertRaises(RuntimeError):
-            self.create_migrate_result_with_just_error_code(MigrateState.IGNORED)
+            TestLfsUtils.create_migrate_result_with_just_error_code(MigrateState.IGNORED)
 
         with self.assertRaises(RuntimeError):
-            self.create_migrate_result_with_just_error_msg(MigrateState.IGNORED)
+            TestLfsUtils.create_migrate_result_with_just_error_msg(MigrateState.IGNORED)
 
     def test_migrate_result_skipped(self):
 
@@ -68,16 +70,16 @@ class TestLfsUtils(unittest.TestCase):
         self.assertEqual(result.__str__(), 'SKIPPED|test.tmp|0:01:13|4|67|None|None')
 
         with self.assertRaises(RuntimeError):
-            self.create_migrate_result_with_no_filename(MigrateState.SKIPPED)
+            TestLfsUtils.create_migrate_result_with_no_filename(MigrateState.SKIPPED)
 
         with self.assertRaises(RuntimeError):
-            self.create_migrate_result_with_no_time_elapsed(MigrateState.SKIPPED)
+            TestLfsUtils.create_migrate_result_with_no_time_elapsed(MigrateState.SKIPPED)
 
         with self.assertRaises(RuntimeError):
-            self.create_migrate_result_with_just_error_code(MigrateState.SKIPPED)
+            TestLfsUtils.create_migrate_result_with_just_error_code(MigrateState.SKIPPED)
 
         with self.assertRaises(RuntimeError):
-            self.create_migrate_result_with_just_error_msg(MigrateState.SKIPPED)
+            TestLfsUtils.create_migrate_result_with_just_error_msg(MigrateState.SKIPPED)
 
     def test_migrate_result_success(self):
 
@@ -88,16 +90,16 @@ class TestLfsUtils(unittest.TestCase):
         self.assertEqual(result.__str__(), 'SUCCESS|test.tmp|0:01:13|4|67|None|None')
 
         with self.assertRaises(RuntimeError):
-            self.create_migrate_result_with_no_filename(MigrateState.SUCCESS)
+            TestLfsUtils.create_migrate_result_with_no_filename(MigrateState.SUCCESS)
 
         with self.assertRaises(RuntimeError):
-            self.create_migrate_result_with_no_time_elapsed(MigrateState.SUCCESS)
+            TestLfsUtils.create_migrate_result_with_no_time_elapsed(MigrateState.SUCCESS)
 
         with self.assertRaises(RuntimeError):
-            self.create_migrate_result_with_just_error_code(MigrateState.SUCCESS)
+            TestLfsUtils.create_migrate_result_with_just_error_code(MigrateState.SUCCESS)
 
         with self.assertRaises(RuntimeError):
-            self.create_migrate_result_with_just_error_msg(MigrateState.SUCCESS)
+            TestLfsUtils.create_migrate_result_with_just_error_msg(MigrateState.SUCCESS)
 
     def test_migrate_result_failed(self):
 
@@ -105,17 +107,13 @@ class TestLfsUtils(unittest.TestCase):
         self.assertEqual(result.__str__(), 'FAILED|test.tmp|0:01:13|4|67|12|An error occured.')
 
         with self.assertRaises(RuntimeError):
-            self.create_migrate_result_with_no_filename(MigrateState.FAILED)
+            TestLfsUtils.create_migrate_result_with_no_filename(MigrateState.FAILED)
 
         with self.assertRaises(RuntimeError):
-            self.create_migrate_result_with_no_time_elapsed(MigrateState.FAILED)
+            TestLfsUtils.create_migrate_result_with_no_time_elapsed(MigrateState.FAILED)
 
         with self.assertRaises(RuntimeError):
-            self.create_migrate_result_with_just_error_code(MigrateState.FAILED)
+            TestLfsUtils.create_migrate_result_with_just_error_code(MigrateState.FAILED)
 
         with self.assertRaises(RuntimeError):
-            self.create_migrate_result_with_just_error_msg(MigrateState.FAILED)
-
-
-
-
+            TestLfsUtils.create_migrate_result_with_just_error_msg(MigrateState.FAILED)

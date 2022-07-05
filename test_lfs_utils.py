@@ -131,3 +131,4 @@ class TestLfsUtils(unittest.TestCase):
 
         with self.assertRaises(LfsUtilsError):
             LfsUtils.lookup_ost_to_oss(self=None, fs_name='lustre-fs', ost=65566)
+

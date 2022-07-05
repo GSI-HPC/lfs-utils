@@ -20,7 +20,7 @@
 import unittest
 
 from datetime import timedelta
-from lfs.lfs_utils import MigrateResult, MigrateState
+from lfs.lfs_utils import LfsUtils, MigrateResult, MigrateState
 
 
 class TestLfsUtils(unittest.TestCase):
@@ -117,3 +117,16 @@ class TestLfsUtils(unittest.TestCase):
 
         with self.assertRaises(RuntimeError):
             TestLfsUtils.create_migrate_result_with_just_error_msg(MigrateState.FAILED)
+
+    def test_lookup_ost_to_oss(self):
+
+        with self.assertRaises(RuntimeError):
+            LfsUtils.lookup_ost_to_oss(self=None, fs_name=None, ost=None)
+
+        with self.assertRaises(RuntimeError):
+            LfsUtils.lookup_ost_to_oss(self=None, fs_name='lustre-fs', ost=None)
+
+        with self.assertRaises(RuntimeError):
+            LfsUtils.lookup_ost_to_oss(self=None, fs_name='lustre-fs', ost='783')
+
+        LfsUtils.lookup_ost_to_oss(self=None, fs_name='lustre-fs', ost=65566)

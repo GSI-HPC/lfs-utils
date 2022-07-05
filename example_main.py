@@ -76,7 +76,11 @@ def main():
 
         args = init_arg_parser()
 
-        lfs_utils = LfsUtils('/usr/bin/lfs')
+        ost = 3
+        fs_name = 'hebe'
+        test_file = '/lustre/hebe/hpc/iannetti/test.tmp'
+
+        lfs_utils = LfsUtils('/usr/bin/lfs', '/usr/sbin/lctl')
 
         if args.print_version:
             print(f"{lfs_utils.version()}")
@@ -96,7 +100,10 @@ def main():
         except LfsUtilsError as err:
             logging.error(err)
 
-        test_file = '/lustre/hebe/hpc/iannetti/test_set_stripe.tmp'
+        try:
+            logging.info(f"OST {ost} is writable: {lfs_utils.is_ost_writable(ost, test_file)}")
+        except LfsUtilsError as err:
+            logging.error(err)
 
         try:
             lfs_utils.set_stripe(0, test_file)
@@ -119,12 +126,18 @@ def main():
         except LfsUtilsError as err:
             logging.error(err)
 
+        try:
+            logging.info(f"Hostname for OST {ost} on file system {fs_name}: {lfs_utils.lookup_ost_to_oss(fs_name, ost)}")
+        except LfsUtilsError as err:
+            logging.error(err)
+
         logging.info('Finished')
 
     except Exception as err:
 
         _, _, exc_tb = sys.exc_info()
         filename = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        # TODO: Add exception type
         logging.error(f"Exception in {filename} (line: {exc_tb.tb_lineno}): {err}")
 
 

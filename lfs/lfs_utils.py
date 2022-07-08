@@ -17,7 +17,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-# VERSION 0.0.1
 
 from enum import Enum
 from datetime import datetime

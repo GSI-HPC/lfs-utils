@@ -20,8 +20,6 @@
 
 import argparse
 import logging
-import sys
-import os
 
 from minimal_python import MinimalPython
 from lfs.lfs_utils import LfsUtils, LfsUtilsError
@@ -30,6 +28,36 @@ from lfs.lfs_utils import LfsUtils, LfsUtilsError
 def init_arg_parser():
 
     parser = argparse.ArgumentParser(description='Example main programm for executing LfsUtils.')
+
+    parser.add_argument('-n',
+                        '--fs-name',
+                        dest='fs_name',
+                        required=True,
+                        type=str,
+                        help='Specify file system name.')
+
+    parser.add_argument('-p',
+                        '--fs-path',
+                        dest='fs_path',
+                        required=False,
+                        type=str,
+                        default='/lustre',
+                        help='Specify file system path.')
+
+    parser.add_argument('-t',
+                        '--test-file',
+                        dest='test_file',
+                        required=True,
+                        type=str,
+                        help='Specify test file.')
+
+    parser.add_argument('-o',
+                        '--ost-index',
+                        dest='ost_index',
+                        required=False,
+                        type=int,
+                        default=3,
+                        help='Specify ost index.')
 
     parser.add_argument('-l',
                         '--log-file',
@@ -76,37 +104,34 @@ def main():
 
         args = init_arg_parser()
 
-        ost = 3
-        fs_name = 'hebe'
-        test_file = '/lustre/hebe/hpc/iannetti/test.tmp'
-
         lfs_utils = LfsUtils('/usr/bin/lfs', '/usr/sbin/lctl')
 
-        if args.print_version:
-            print(f"{lfs_utils.version()}")
-            sys.exit()
-
         init_logging(args.log_file, args.enable_debug)
+
+        fs_name   = args.fs_name
+        fs_path   = args.fs_path
+        test_file = args.test_file
+        ost_index = args.ost_index
 
         logging.info('Started')
 
         try:
-            logging.info(f"Size of OSTItem list: {len(lfs_utils.create_ost_item_list('hebe'))}")
+            logging.info(f"Size of OSTItem list: {len(lfs_utils.create_ost_item_list(fs_name))}")
         except LfsUtilsError as err:
             logging.error(err)
 
         try:
-            logging.info(f"Is OST 0 active: {lfs_utils.is_ost_idx_active('hebe', 0)}")
+            logging.info(f"Is OST {ost_index} active: {lfs_utils.is_ost_idx_active(fs_name, ost_index)}")
         except LfsUtilsError as err:
             logging.error(err)
 
         try:
-            logging.info(f"OST {ost} is writable: {lfs_utils.is_ost_writable(ost, test_file)}")
+            logging.info(f"OST {ost_index} is writable: {lfs_utils.is_ost_writable(ost_index, test_file)}")
         except LfsUtilsError as err:
             logging.error(err)
 
         try:
-            lfs_utils.set_stripe(0, test_file)
+            lfs_utils.set_stripe(ost_index, test_file)
         except LfsUtilsError as err:
             logging.error(err)
 
@@ -117,28 +142,29 @@ def main():
             logging.error(err)
 
         try:
-            logging.info(lfs_utils.migrate_file(test_file, 0, 1))
+            logging.info(lfs_utils.migrate_file(test_file, ost_index, 0))
         except LfsUtilsError as err:
             logging.error(err)
 
         try:
-            logging.info(f"Size of OST fill level items: {len(lfs_utils.retrieve_ost_fill_level('/lustre'))}")
+            logging.info(lfs_utils.migrate_file(test_file))
         except LfsUtilsError as err:
             logging.error(err)
 
         try:
-            logging.info(f"Hostname for OST {ost} on file system {fs_name}: {lfs_utils.lookup_ost_to_oss(fs_name, ost)}")
+            logging.info(f"Size of OST fill level items: {len(lfs_utils.retrieve_ost_fill_level(fs_path))}")
+        except LfsUtilsError as err:
+            logging.error(err)
+
+        try:
+            logging.info(f"Hostname for OST {ost_index} on file system {fs_name}: {lfs_utils.lookup_ost_to_oss(fs_name, ost_index)}")
         except LfsUtilsError as err:
             logging.error(err)
 
         logging.info('Finished')
 
-    except Exception as err:
-
-        _, _, exc_tb = sys.exc_info()
-        filename = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        # TODO: Add exception type
-        logging.error(f"Exception in {filename} (line: {exc_tb.tb_lineno}): {err}")
+    except Exception:
+        logging.exception('Caught exception in main function...')
 
 
 if __name__ == '__main__':

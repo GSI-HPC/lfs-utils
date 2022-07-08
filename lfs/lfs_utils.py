@@ -17,30 +17,20 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-
-import os
-import re
-import traceback
-import yaml
-import socket
-import logging
-import subprocess
+# VERSION 0.0.1
 
 from enum import Enum
-from datetime import datetime, timedelta
+from datetime import datetime
+
+import logging
+import os
+import re
+import socket
+import subprocess
+import yaml
 
 
-def check_value_for_type(value, type_):
-
-    if value is not None and not isinstance(value, type_):
-
-        # Better then nothing, but just the caller not the complete stack trace.
-        caller = traceback.extract_stack(limit=2)[0]
-
-        err = f"Value {value} must be type of {type_}\n" \
-              f"Caller: Filename {caller.filename}, line {caller.lineno}, in {caller.name}"
-
-        raise LfsUtilsError(err)
+# TODO: Comment code...
 
 class LfsUtilsError(Exception):
     """Exception class LfsUtils specific errors."""
@@ -82,61 +72,82 @@ class StripeInfo:
 
 class MigrateState(str, Enum):
 
-    IGNORED = 'IGNORED'
-    SKIPPED = 'SKIPPED'
-    SUCCESS = 'SUCCESS'
-    FAILED  = 'FAILED'
+    DISPLACED = 'DISPLACED'
+    IGNORED   = 'IGNORED'
+    SKIPPED   = 'SKIPPED'
+    SUCCESS   = 'SUCCESS'
+    FAILED    = 'FAILED'
 
 class MigrateResult:
     '''
-    * IGNORED|{filename}
-        - if file has stripe index not equal source index
-        - if file has stripe index equal target index
-    * SKIPPED|{filename}
-        - if skip option enabled and file stripe count > 1
-    * SUCCESS|{filename}|{ost_source_index}|{ost_target_index}|{time_elapsed}
-        - if migration of file was successful
-    * FAILED|{filename}|{return_code}|{error_message}
-        - if migration of file failed
+    Format per result:
+    * DISPLACED|filename|time_elapsed|source_index|target_index
+      - if file was migrated successfully, but ost target index is different
+    * FAILED|filename|time_elapsed|error_code|error_message|source_index|target_index
+      - if migration process for file failed
+    * IGNORED|filename
+      - if file has stripe index not equal source index
+      - if file has stripe index equal target index
+    * SKIPPED|filename
+      - if skip option enabled and file stripe count > 1
+    * SUCCESS|filename|time_elapsed|source_index|target_index
+      - if migration of file was successful
     '''
 
-    def __init__(self, state, filename, time_elapsed, source_idx=None, target_idx=None, error_code=None, error_msg=None):
+    _result = ''
 
-        check_value_for_type(state, MigrateState)
-        check_value_for_type(filename, str)
-        check_value_for_type(time_elapsed, timedelta)
-        check_value_for_type(source_idx, int)
-        check_value_for_type(target_idx, int)
-        check_value_for_type(error_code, int)
-        check_value_for_type(error_msg, str)
+    @classmethod
+    def __conv_none__(cls, arg) -> str:
 
-        if not filename:
-            raise LfsUtilsError('No filename set.')
+        if arg is None:
+            return ''
 
-        if time_elapsed is None:
-            raise LfsUtilsError('No time_elapsed set.')
+        return arg
 
-        if state == MigrateState.FAILED:
+    def __init__(self, state, filename, time_elapsed=None, source_idx=None, target_idx=None, error_code=None, error_msg=''):
+
+        if MigrateState.DISPLACED == state:
+
+            if not time_elapsed:
+                raise LfsUtilsError(f"State {MigrateState.DISPLACED} requires time_elapsed to be set.")
+
+            source_index = __class__.__conv_none__(source_idx)
+            target_index = __class__.__conv_none__(target_idx)
+
+            self._result = f"{MigrateState.DISPLACED}|{filename}|{time_elapsed}|{source_index}|{target_index}"
+
+        elif MigrateState.FAILED == state:
+
+            if not time_elapsed:
+                raise LfsUtilsError(f"State {MigrateState.FAILED} requires time_elapsed to be set.")
             if not error_code:
-                raise LfsUtilsError('State FAILED requires error_code to be set.')
+                raise LfsUtilsError(f"State {MigrateState.FAILED} requires error_code to be set.")
             if not error_msg:
-                raise LfsUtilsError('State FAILED requires error_msg to be set.')
-        else:
-            if error_code:
-                raise LfsUtilsError(f"Not allowed to set error_code in state {state}.")
-            if error_msg:
-                raise LfsUtilsError(f"Not allowed to set error_msg in state {state}.")
+                raise LfsUtilsError(f"State {MigrateState.FAILED} requires error_msg to be set.")
 
-        self.state = state
-        self.filename = filename
-        self.source_idx = source_idx
-        self.target_idx = target_idx
-        self.time_elapsed = time_elapsed
-        self.error_code = error_code
-        self.error_msg = error_msg
+            source_index = __class__.__conv_none__(source_idx)
+            target_index = __class__.__conv_none__(target_idx)
+
+            self._result = f"{MigrateState.FAILED}|{filename}|{time_elapsed}|{error_code}|{error_msg}|{source_index}|{target_index}"
+
+        elif MigrateState.IGNORED == state:
+            self._result = f"{MigrateState.IGNORED}|{filename}"
+
+        elif MigrateState.SKIPPED == state:
+            self._result = f"{MigrateState.SKIPPED}|{filename}"
+
+        elif state == MigrateState.SUCCESS:
+
+            if not time_elapsed:
+                raise LfsUtilsError(f"State {MigrateState.SUCCESS} requires time_elapsed to be set.")
+
+            source_index = __class__.__conv_none__(source_idx)
+            target_index = __class__.__conv_none__(target_idx)
+
+            self._result = f"{MigrateState.SUCCESS}|{filename}|{time_elapsed}|{source_index}|{target_index}"
 
     def __str__(self) -> str:
-        return f"{self.state}|{self.filename}|{self.time_elapsed}|{self.source_idx}|{self.target_idx}|{self.error_code}|{self.error_msg}"
+        return self._result
 
 class LfsUtils:
 
@@ -167,6 +178,7 @@ class LfsUtils:
             args = ['sudo', self.lfs, 'check', 'osts']
             result = subprocess.run(args, check=True, capture_output=True)
         except subprocess.CalledProcessError as err:
+            # pylint: disable=W0707
             raise LfsUtilsError(err.stderr.decode('UTF-8'))
 
         ost_list = []
@@ -223,6 +235,7 @@ class LfsUtils:
             args = [self.lfs, 'setstripe', '-i', str(ost_idx), file_path]
             subprocess.run(args, check=True, capture_output=True)
         except subprocess.CalledProcessError as err:
+            # pylint: disable=W0707
             raise LfsUtilsError(err.stderr.decode('UTF-8'))
 
     def stripe_info(self, filename) -> StripeInfo:
@@ -262,73 +275,60 @@ class LfsUtils:
             return StripeInfo(filename, lmm_stripe_count, lmm_stripe_offset)
 
         except subprocess.CalledProcessError as err:
+            # pylint: disable=W0707
             raise LfsUtilsError(err.stderr.decode('UTF-8'))
 
     def migrate_file(self, filename, source_idx=None, target_idx=None, block=False, skip=True) -> str:
 
-        migrate_result = ''
+        pre_stripe_info = self.stripe_info(filename)
+        pre_ost_idx = pre_stripe_info.index
 
-        if not filename:
-            raise LfsUtilsError('Empty filename provided.')
+        if skip and pre_stripe_info.count > 1:
+            return MigrateResult(MigrateState.SKIPPED, filename)
+        if source_idx is not None and pre_ost_idx != source_idx:
+            return MigrateResult(MigrateState.IGNORED, filename)
+        if target_idx is not None and pre_ost_idx == target_idx:
+            return MigrateResult(MigrateState.IGNORED, filename)
 
-        check_value_for_type(filename, str)
-
-        if source_idx is not None:
-            check_value_for_type(source_idx, int)
-
-        if target_idx is not None:
-            check_value_for_type(target_idx, int)
+        args = [self.lfs, 'migrate']
 
         if block:
-            check_value_for_type(block, bool)
-
-        if skip:
-            check_value_for_type(skip, bool)
-
-        stripe_info = self.stripe_info(filename)
-
-        if skip and stripe_info.count > 1:
-            migrate_result = MigrateResult(MigrateState.SKIPPED, filename, timedelta(0), source_idx, target_idx)
-        elif source_idx is not None and stripe_info.index != source_idx:
-            migrate_result = MigrateResult(MigrateState.IGNORED, filename, timedelta(0), source_idx, target_idx)
-        elif target_idx is not None and stripe_info.index == target_idx:
-            migrate_result = MigrateResult(MigrateState.IGNORED, filename, timedelta(0), source_idx, target_idx)
+            args.append('--block')
         else:
+            args.append('--non-block')
 
-            try:
-                args = [self.lfs, 'migrate']
+        # TODO: Check OST min and max index
+        if target_idx is not None and target_idx >= 0:
+            args.append('-i')
+            args.append(str(target_idx))
 
-                if block:
-                    args.append('--block')
-                else:
-                    args.append('--non-block')
+        if pre_stripe_info.count > 0:
+            args.append('-c')
+            args.append(str(pre_stripe_info.count))
 
-                if target_idx > -1:
-                    args.append('-i')
-                    args.append(str(target_idx))
+        args.append(filename)
 
-                if stripe_info.count > 0:
-                    args.append('-c')
-                    args.append(str(stripe_info.count))
+        try:
 
-                args.append(filename)
+            start_time = datetime.now()
+            subprocess.run(args, check=True, capture_output=True)
+            time_elapsed = datetime.now() - start_time
 
-                start_time = datetime.now()
-                subprocess.run(args, check=True, capture_output=True)
-                time_elapsed = datetime.now() - start_time
+            post_ost_idx = self.stripe_info(filename).index
 
-                migrate_result = MigrateResult(MigrateState.SUCCESS, filename, time_elapsed, source_idx, target_idx)
+            if target_idx is not None and target_idx != post_ost_idx:
+                return MigrateResult(MigrateState.DISPLACED, filename, time_elapsed, pre_ost_idx, post_ost_idx)
 
-            except subprocess.CalledProcessError as err:
+            return MigrateResult(MigrateState.SUCCESS, filename, time_elapsed, pre_ost_idx, post_ost_idx)
 
-                stderr = ''
+        except subprocess.CalledProcessError as err:
 
-                if err.stderr:
-                    stderr = err.stderr.decode('UTF-8')
+            stderr = ''
 
-                migrate_result = MigrateResult(MigrateState.FAILED, filename, time_elapsed, source_idx, target_idx, err.returncode, stderr)
+            if err.stderr:
+                stderr = err.stderr.decode('UTF-8')
 
-        return migrate_result
+            return MigrateResult(MigrateState.FAILED, filename, time_elapsed, pre_ost_idx, post_ost_idx, err.returncode, stderr)
 
     def retrieve_ost_fill_level(self, fs_path) -> dict:
 
@@ -358,27 +358,18 @@ class LfsUtils:
                 raise LfsUtilsError('Lustre OST fill levels are empty!')
 
         except subprocess.CalledProcessError as err:
+            # pylint: disable=W0707
             raise LfsUtilsError(err.stderr.decode('UTF-8'))
 
         return ost_fill_level_dict
 
+    # TODO: Implement lookup in cache
     def lookup_ost_to_oss(self, fs_name, ost, caching=True) -> str:
 
         hostname = ''
 
-        if not fs_name:
-            raise LfsUtilsError('Lustre file system name must be set.')
-
-        if ost is None:
-            raise LfsUtilsError('OST index must be set.')
-
-        check_value_for_type(fs_name, str)
-        check_value_for_type(ost, int)
-
         if ost < 0 or ost > LfsUtils._MAX_OST_INDEX:
             raise LfsUtilsError(f"OST index {ost} invalid. Must be in range between 0 and {LfsUtils._MAX_OST_INDEX}.")
-
-        # TODO: Lookup in cache
 
         ost_hex = hex(ost).split('x')[-1].zfill(4)
 
@@ -400,8 +391,6 @@ class LfsUtils:
         if not host_info:
             raise LfsUtilsError(f"No host information retrieved from socket.gethostbyaddr() for IP addr {ip_addr}")
 
-        check_value_for_type(host_info, tuple)
-
         if len(host_info) != 3:
             raise LfsUtilsError(f"Broken interface for value {host_info} on socket.gethostbyaddr()")
 
@@ -409,8 +398,6 @@ class LfsUtils:
 
         if not hostname:
             raise LfsUtilsError(f"No hostname found for OST {ost} on file system {fs_name}")
-
-        check_value_for_type(hostname, str)
 
         return hostname
 
@@ -424,9 +411,6 @@ class LfsUtils:
 
         if ost is None:
             raise LfsUtilsError('OST index must be set.')
-
-        check_value_for_type(ost, int)
-        check_value_for_type(file_path, str)
 
         if ost < 0 or ost > LfsUtils._MAX_OST_INDEX:
             raise LfsUtilsError(f"OST index {ost} invalid. Must be in range between 0 and {LfsUtils._MAX_OST_INDEX}.")
@@ -451,3 +435,6 @@ class LfsUtils:
             logging.error(err)
 
         return False
+
+    def create_dir_on_mdt(self, index, path):
+        pass

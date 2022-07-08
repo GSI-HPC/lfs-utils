@@ -20,7 +20,7 @@
 import unittest
 
 from datetime import timedelta
-from lfs.lfs_utils import LfsUtils, LfsUtilsError, MigrateResult, MigrateState
+from lfs_utils import LfsUtils, LfsUtilsError, MigrateResult, MigrateState
 
 
 class TestLfsUtils(unittest.TestCase):

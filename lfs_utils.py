@@ -29,6 +29,9 @@ import subprocess
 import yaml
 
 
+VERSION='0.0.1'
+
+
 # TODO: Comment code...
 
 class LfsUtilsError(Exception):

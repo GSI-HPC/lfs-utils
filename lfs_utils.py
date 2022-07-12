@@ -29,7 +29,7 @@ import subprocess
 import yaml
 
 
-VERSION='0.0.1'
+VERSION='0.0.2'
 
 
 # TODO: Comment code...
@@ -85,8 +85,8 @@ class MigrateResult:
     Format per result:
     * DISPLACED|filename|time_elapsed|source_index|target_index
       - if file was migrated successfully, but ost target index is different
-    * FAILED|filename|time_elapsed|error_code|error_message|source_index|target_index
-      - if migration process for file failed
+    * FAILED|filename|time_elapsed|source_index|target_index|error_message
+      - if migration process failed for file
     * IGNORED|filename
       - if file has stripe index not equal source index
       - if file has stripe index equal target index
@@ -106,12 +106,16 @@ class MigrateResult:
 
         return arg
 
-    def __init__(self, state, filename, time_elapsed=None, source_idx=None, target_idx=None, error_code=None, error_msg=''):
+    def __init__(self, state, filename, time_elapsed, source_idx=None, target_idx=None, error_msg=None):
+
+        # TODO: Check on data types and value if required?
+        if filename is None or not filename:
+            raise LfsUtilsError('Argument filename must be set.')
+
+        if time_elapsed is None:
+            raise LfsUtilsError('Argument time_elapsed must be set.')
 
         if MigrateState.DISPLACED == state:
-
-            if not time_elapsed:
-                raise LfsUtilsError(f"State {MigrateState.DISPLACED} requires time_elapsed to be set.")
 
             source_index = __class__.__conv_none__(source_idx)
             target_index = __class__.__conv_none__(target_idx)
@@ -120,17 +124,13 @@ class MigrateResult:
 
         elif MigrateState.FAILED == state:
 
-            if not time_elapsed:
-                raise LfsUtilsError(f"State {MigrateState.FAILED} requires time_elapsed to be set.")
-            if not error_code:
-                raise LfsUtilsError(f"State {MigrateState.FAILED} requires error_code to be set.")
             if not error_msg:
                 raise LfsUtilsError(f"State {MigrateState.FAILED} requires error_msg to be set.")
 
             source_index = __class__.__conv_none__(source_idx)
             target_index = __class__.__conv_none__(target_idx)
 
-            self._result = f"{MigrateState.FAILED}|{filename}|{time_elapsed}|{error_code}|{error_msg}|{source_index}|{target_index}"
+            self._result = f"{MigrateState.FAILED}|{filename}|{time_elapsed}|{source_index}|{target_index}|{error_msg}"
 
         elif MigrateState.IGNORED == state:
             self._result = f"{MigrateState.IGNORED}|{filename}"
@@ -139,9 +139,6 @@ class MigrateResult:
             self._result = f"{MigrateState.SKIPPED}|{filename}"
 
         elif state == MigrateState.SUCCESS:
-
-            if not time_elapsed:
-                raise LfsUtilsError(f"State {MigrateState.SUCCESS} requires time_elapsed to be set.")
 
             source_index = __class__.__conv_none__(source_idx)
             target_index = __class__.__conv_none__(target_idx)
@@ -160,21 +157,16 @@ class LfsUtils:
     _REGEX_PATTERN_OST_FILL_LEVEL = re.compile(_REGEX_STR_OST_FILL_LEVEL)
     _REGEX_PATTERN_OST_CONN_UUID = re.compile(_REGEX_STR_OST_CONN_UUID)
 
-    _MAX_OST_INDEX = 65535
+    MIN_OST_INDEX = 0
+    MAX_OST_INDEX = 65535
 
-    def __init__(self, lfs, lctl):
-
-        if not os.path.isfile(lfs):
-            raise LfsUtilsError(f"LFS binary was not found under: '{lfs}'")
-
-        if not os.path.isfile(lctl):
-            raise LfsUtilsError(f"LCTL binary was not found under: '{lctl}'")
+    def __init__(self, lfs='/usr/bin/lfs', lctl='/usr/sbin/lctl'):
 
         self.lfs = lfs
         self.lctl = lctl
 
     # TODO: Return dict for multiple targets with proper OST items.
-    def create_ost_item_list(self, target):
+    def create_ost_item_list(self, target) -> list:
 
         try:
             args = ['sudo', self.lfs, 'check', 'osts']
@@ -208,6 +200,7 @@ class LfsUtils:
 
         return ost_list
 
+    # TODO: Return boolean
     def is_ost_idx_active(self, target, ost_idx):
 
         for ost_item in self.create_ost_item_list(target):
@@ -215,7 +208,7 @@ class LfsUtils:
             if ost_item.ost_idx == ost_idx:
                 return ost_item.active
 
-        raise LfsUtilsError(f"Index not found: {ost_idx}")
+        raise LfsUtilsError(f"Index {ost_idx} not found on target {target}")
 
     def set_stripe(self, ost_idx, file_path):
 
@@ -248,89 +241,101 @@ class LfsUtils:
             * If a field is not found in retrieved stripe info for given file.
             * If execution of 'lfs getstripe' returns an error.
 
+        subprocess.CalledProcessError on lfs getstripe.
+
         Returns
         -------
         A StripeInfo object.
         """
 
-        try:
+        args = [self.lfs, 'getstripe', '-c', '-i', '-y', filename]
 
-            args = [self.lfs, 'getstripe', '-c', '-i', '-y', filename]
+        result = subprocess.run(args, check=True, capture_output=True)
 
-            result = subprocess.run(args, check=True, capture_output=True)
+        # TODO: Write a test that checks on dict type and content...
+        fields = yaml.safe_load(result.stdout)
 
-            # TODO: Write a test that checks on dict type and content...
-            fields = yaml.safe_load(result.stdout)
-
-            lmm_stripe_count = 0
-            if StripeField.LMM_STRIPE_COUNT in fields:
-                lmm_stripe_count = fields[StripeField.LMM_STRIPE_COUNT]
-            else:
-                raise LfsUtilsError(f"Field {StripeField.LMM_STRIPE_COUNT} not found in stripe info: {result.stdout}")
-
-            lmm_stripe_offset = 0
-            if StripeField.LMM_STRIPE_OFFSET in fields:
-                lmm_stripe_offset = fields[StripeField.LMM_STRIPE_OFFSET]
-            else:
-                raise LfsUtilsError(f"Field {StripeField.LMM_STRIPE_OFFSET} not found in stripe info: {result.stdout}")
-
-            return StripeInfo(filename, lmm_stripe_count, lmm_stripe_offset)
-
-        except subprocess.CalledProcessError as err:
-            # pylint: disable=W0707
-            raise LfsUtilsError(err.stderr.decode('UTF-8'))
-
-    def migrate_file(self, filename, source_idx=None, target_idx=None, block=False, skip=True) -> str:
-
-        pre_stripe_info = self.stripe_info(filename)
-        pre_ost_idx = pre_stripe_info.index
-
-        if skip and pre_stripe_info.count > 1:
-            return MigrateResult(MigrateState.SKIPPED, filename)
-        if source_idx is not None and pre_ost_idx != source_idx:
-            return MigrateResult(MigrateState.IGNORED, filename)
-        if target_idx is not None and pre_ost_idx == target_idx:
-            return MigrateResult(MigrateState.IGNORED, filename)
-
-        args = [self.lfs, 'migrate']
-
-        if block:
-            args.append('--block')
+        lmm_stripe_count = 0
+        if StripeField.LMM_STRIPE_COUNT in fields:
+            lmm_stripe_count = fields[StripeField.LMM_STRIPE_COUNT]
         else:
-            args.append('--non-block')
+            raise LfsUtilsError(f"Field {StripeField.LMM_STRIPE_COUNT} not found in stripe info: {result.stdout}")
 
-        # TODO: Check OST min and max index
-        if target_idx is not None and target_idx >= 0:
-            args.append('-i')
-            args.append(str(target_idx))
+        lmm_stripe_offset = 0
+        if StripeField.LMM_STRIPE_OFFSET in fields:
+            lmm_stripe_offset = fields[StripeField.LMM_STRIPE_OFFSET]
+        else:
+            raise LfsUtilsError(f"Field {StripeField.LMM_STRIPE_OFFSET} not found in stripe info: {result.stdout}")
 
-        if pre_stripe_info.count > 0:
-            args.append('-c')
-            args.append(str(pre_stripe_info.count))
+        return StripeInfo(filename, lmm_stripe_count, lmm_stripe_offset)
 
-        args.append(filename)
+    def migrate_file(self, filename, source_idx=None, target_idx=None, block=False, skip=True) -> MigrateResult:
+
+        state        = None
+        pre_ost_idx  = None
+        post_ost_idx = None
+        error_msg    = None
+
+        start_time = datetime.now()
 
         try:
 
-            start_time = datetime.now()
-            subprocess.run(args, check=True, capture_output=True)
-            time_elapsed = datetime.now() - start_time
+            pre_stripe_info = self.stripe_info(filename)
 
-            post_ost_idx = self.stripe_info(filename).index
+            pre_ost_idx = pre_stripe_info.index
 
-            if target_idx is not None and target_idx != post_ost_idx:
-                return MigrateResult(MigrateState.DISPLACED, filename, time_elapsed, pre_ost_idx, post_ost_idx)
+            if skip and pre_stripe_info.count > 1:
+                state = MigrateState.SKIPPED
+            elif source_idx is not None and pre_ost_idx != source_idx:
+                state = MigrateState.IGNORED
+            elif target_idx is not None and pre_ost_idx == target_idx:
+                state = MigrateState.IGNORED
+            else:
 
-            return MigrateResult(MigrateState.SUCCESS, filename, time_elapsed, pre_ost_idx, post_ost_idx)
+                args = [self.lfs, 'migrate']
+
+                if block:
+                    args.append('--block')
+                else:
+                    args.append('--non-block')
+
+                # TODO: Check OST min and max index
+                if target_idx is not None and target_idx >= 0:
+                    args.append('-i')
+                    args.append(str(target_idx))
+
+                if pre_stripe_info.count > 0:
+                    args.append('-c')
+                    args.append(str(pre_stripe_info.count))
+
+                args.append(filename)
+
+                # Save target OST index in case of migration failure.
+                post_ost_idx = target_idx
+
+                subprocess.run(args, check=True, capture_output=True)
+
+                post_ost_idx = self.stripe_info(filename).index
+
+                if target_idx is not None and target_idx != post_ost_idx:
+                    state = MigrateState.DISPLACED
+                else:
+                    state = MigrateState.SUCCESS
 
         except subprocess.CalledProcessError as err:
-
-            stderr = ''
 
             if err.stderr:
-                stderr = err.stderr.decode('UTF-8')
+                error_msg = err.stderr.decode('UTF-8')
 
-            return MigrateResult(MigrateState.FAILED, filename, time_elapsed, pre_ost_idx, post_ost_idx, err.returncode, stderr)
+            state = MigrateState.FAILED
+
+        except LfsUtilsError as err:
+            error_msg = str(err)
+            state = MigrateState.FAILED
+
+        time_elapsed = datetime.now() - start_time
+
+        return MigrateResult(state, filename, time_elapsed, pre_ost_idx, post_ost_idx, error_msg)
 
     def retrieve_ost_fill_level(self, fs_path) -> dict:
 
@@ -370,8 +375,8 @@ class LfsUtils:
 
         hostname = ''
 
-        if ost < 0 or ost > LfsUtils._MAX_OST_INDEX:
-            raise LfsUtilsError(f"OST index {ost} invalid. Must be in range between 0 and {LfsUtils._MAX_OST_INDEX}.")
+        if ost < LfsUtils.MIN_OST_INDEX or ost > LfsUtils.MAX_OST_INDEX:
+            raise LfsUtilsError(f"OST index {ost} invalid. Must be in range between {LfsUtils.MIN_OST_INDEX} and {LfsUtils.MAX_OST_INDEX}.")
 
         ost_hex = hex(ost).split('x')[-1].zfill(4)
 
@@ -414,8 +419,8 @@ class LfsUtils:
         if ost is None:
             raise LfsUtilsError('OST index must be set.')
 
-        if ost < 0 or ost > LfsUtils._MAX_OST_INDEX:
-            raise LfsUtilsError(f"OST index {ost} invalid. Must be in range between 0 and {LfsUtils._MAX_OST_INDEX}.")
+        if ost < LfsUtils.MIN_OST_INDEX or ost > LfsUtils.MAX_OST_INDEX:
+            raise LfsUtilsError(f"OST index {ost} invalid. Must be in range between {LfsUtils.MIN_OST_INDEX} and {LfsUtils.MAX_OST_INDEX}.")
 
         if os.path.exists(file_path):
             raise LfsUtilsError(f"File already exists: {file_path}")

@@ -104,7 +104,7 @@ def main():
 
         args = init_arg_parser()
 
-        lfs_utils = LfsUtils('/usr/bin/lfs', '/usr/sbin/lctl')
+        lfs_utils = LfsUtils()
 
         init_logging(args.log_file, args.enable_debug)
 
@@ -164,7 +164,7 @@ def main():
         logging.info('Finished')
 
     except Exception:
-        logging.exception('Caught exception in main function...')
+        logging.exception('Caught exception in main function')
 
 
 if __name__ == '__main__':

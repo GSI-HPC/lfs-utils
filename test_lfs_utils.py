@@ -35,11 +35,7 @@ class TestLfsUtils(unittest.TestCase):
 
     @classmethod
     def create_migrate_result_with_just_error_code(cls, state):
-        MigrateResult(state, 'test.tmp', timedelta(0), error_code=12)
-
-    @classmethod
-    def create_migrate_result_with_just_error_msg(cls, state):
-        MigrateResult(state, 'test.tmp', timedelta(0), error_msg='An error occured.')
+        MigrateResult(state, 'test.tmp', timedelta(0))
 
     def test_migrate_result_displaced(self):
 
@@ -57,8 +53,8 @@ class TestLfsUtils(unittest.TestCase):
 
     def test_migrate_result_failed(self):
 
-        result = MigrateResult(MigrateState.FAILED, 'test.tmp', timedelta(minutes=1, seconds=13), 783, 560, 1, 'An error occured.')
-        self.assertEqual(result.__str__(), 'FAILED|test.tmp|0:01:13|1|An error occured.|783|560')
+        result = MigrateResult(MigrateState.FAILED, 'test.tmp', timedelta(minutes=1, seconds=13), 783, 560, 'An error occured.')
+        self.assertEqual(result.__str__(), 'FAILED|test.tmp|0:01:13|783|560|An error occured.')
 
         with self.assertRaises(LfsUtilsError):
             TestLfsUtils.create_migrate_result_with_no_filename(MigrateState.FAILED)
@@ -67,19 +63,16 @@ class TestLfsUtils(unittest.TestCase):
             TestLfsUtils.create_migrate_result_with_no_time_elapsed(MigrateState.FAILED)
 
         with self.assertRaises(LfsUtilsError):
-            TestLfsUtils.create_migrate_result_with_just_error_code(MigrateState.FAILED)
-
-        with self.assertRaises(LfsUtilsError):
-            TestLfsUtils.create_migrate_result_with_just_error_msg(MigrateState.FAILED)
+            MigrateResult(MigrateState.FAILED, 'test.tmp', timedelta(0), error_msg='')
 
     def test_migrate_result_ignored(self):
 
-        result = MigrateResult(MigrateState.IGNORED, 'test.tmp')
+        result = MigrateResult(MigrateState.IGNORED, 'test.tmp', timedelta(0))
         self.assertEqual(result.__str__(), 'IGNORED|test.tmp')
 
     def test_migrate_result_skipped(self):
 
-        result = MigrateResult(MigrateState.SKIPPED, 'test.tmp')
+        result = MigrateResult(MigrateState.SKIPPED, 'test.tmp', timedelta(0))
         self.assertEqual(result.__str__(), 'SKIPPED|test.tmp')
 
     def test_migrate_result_success(self):
@@ -100,4 +93,3 @@ class TestLfsUtils(unittest.TestCase):
 
         with self.assertRaises(LfsUtilsError):
             LfsUtils.lookup_ost_to_oss(self=None, fs_name='lustre-fs', ost=65566)
-

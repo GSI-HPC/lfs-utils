@@ -168,12 +168,8 @@ class LfsUtils:
     # TODO: Return dict for multiple targets with proper OST items.
     def create_ost_item_list(self, target) -> list:
 
-        try:
-            args = ['sudo', self.lfs, 'check', 'osts']
-            result = subprocess.run(args, check=True, capture_output=True)
-        except subprocess.CalledProcessError as err:
-            # pylint: disable=W0707
-            raise LfsUtilsError(err.stderr.decode('UTF-8'))
+        args = ['sudo', self.lfs, 'check', 'osts']
+        result = subprocess.run(args, check=True, capture_output=True)
 
         ost_list = []
 

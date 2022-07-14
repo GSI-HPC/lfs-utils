@@ -22,8 +22,30 @@ import unittest
 from datetime import timedelta
 from lfs_utils import LfsUtils, LfsUtilsError, MigrateResult, MigrateState
 
-
 class TestLfsUtils(unittest.TestCase):
+
+    def test_lookup_ost_to_oss(self):
+
+        with self.assertRaises(LfsUtilsError):
+            LfsUtils.lookup_ost_to_oss(self=None, fs_name='lustre-fs', ost=65566)
+
+    def test_retrieve_component_states(self):
+
+        comp_states = LfsUtils.retrieve_component_states(self=None, file='lfs_check_servers.txt')
+
+        self.assertEqual(len(comp_states['lustre'].mdts), 3)
+        self.assertEqual(len(comp_states['lustre'].osts), 784)
+
+        self.assertEqual(len(comp_states['lustrefs2'].mdts), 3)
+        self.assertEqual(len(comp_states['lustrefs2'].osts), 10)
+
+    # TODO: Refactor LfsUtils as Singleton class.
+    # def test_is_ost_idx_active(self):
+
+    #     self.assertEqual(LfsUtils.is_ost_idx_active(target='lustre', idx=0), True)
+    #     self.assertEqual(LfsUtils.is_ost_idx_active(target='lustrefs2', idx=3), False)
+
+class TestLfsUtilsMigration(unittest.TestCase):
 
     @classmethod
     def create_migrate_result_with_no_filename(cls, state):
@@ -46,10 +68,10 @@ class TestLfsUtils(unittest.TestCase):
         self.assertEqual(result.__str__(), 'DISPLACED|test.tmp|0:01:13|4|67')
 
         with self.assertRaises(LfsUtilsError):
-            TestLfsUtils.create_migrate_result_with_no_filename(MigrateState.DISPLACED)
+            TestLfsUtilsMigration.create_migrate_result_with_no_filename(MigrateState.DISPLACED)
 
         with self.assertRaises(LfsUtilsError):
-            TestLfsUtils.create_migrate_result_with_no_time_elapsed(MigrateState.DISPLACED)
+            TestLfsUtilsMigration.create_migrate_result_with_no_time_elapsed(MigrateState.DISPLACED)
 
     def test_migrate_result_failed(self):
 
@@ -57,10 +79,10 @@ class TestLfsUtils(unittest.TestCase):
         self.assertEqual(result.__str__(), 'FAILED|test.tmp|0:01:13|783|560|An error occured.')
 
         with self.assertRaises(LfsUtilsError):
-            TestLfsUtils.create_migrate_result_with_no_filename(MigrateState.FAILED)
+            TestLfsUtilsMigration.create_migrate_result_with_no_filename(MigrateState.FAILED)
 
         with self.assertRaises(LfsUtilsError):
-            TestLfsUtils.create_migrate_result_with_no_time_elapsed(MigrateState.FAILED)
+            TestLfsUtilsMigration.create_migrate_result_with_no_time_elapsed(MigrateState.FAILED)
 
         with self.assertRaises(LfsUtilsError):
             MigrateResult(MigrateState.FAILED, 'test.tmp', timedelta(0), error_msg='')
@@ -84,12 +106,7 @@ class TestLfsUtils(unittest.TestCase):
         self.assertEqual(result.__str__(), 'SUCCESS|test.tmp|0:01:13|4|67')
 
         with self.assertRaises(LfsUtilsError):
-            TestLfsUtils.create_migrate_result_with_no_filename(MigrateState.SUCCESS)
+            TestLfsUtilsMigration.create_migrate_result_with_no_filename(MigrateState.SUCCESS)
 
         with self.assertRaises(LfsUtilsError):
-            TestLfsUtils.create_migrate_result_with_no_time_elapsed(MigrateState.SUCCESS)
-
-    def test_lookup_ost_to_oss(self):
-
-        with self.assertRaises(LfsUtilsError):
-            LfsUtils.lookup_ost_to_oss(self=None, fs_name='lustre-fs', ost=65566)
+            TestLfsUtilsMigration.create_migrate_result_with_no_time_elapsed(MigrateState.SUCCESS)

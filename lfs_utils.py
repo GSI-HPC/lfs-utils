@@ -231,8 +231,8 @@ class LfsUtils:
 
         return comp_states
 
-    def is_ost_idx_active(self, target, ost_idx, file=None):
-        return self.retrieve_component_states(file)[target].osts[ost_idx].active
+    def is_ost_idx_active(self, target, idx, file=None) -> bool:
+        return self.retrieve_component_states(file)[target].osts[idx].active
 
     def set_stripe(self, ost_idx, file_path):
 

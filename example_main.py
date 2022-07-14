@@ -59,12 +59,6 @@ def init_arg_parser():
                         default=3,
                         help='Specify ost index.')
 
-    parser.add_argument('--file-lfs-check-servers',
-                        dest='file_lfs_check_servers',
-                        required=False,
-                        type=str,
-                        help='Specify lfs check servers input file.')
-
     parser.add_argument('-l',
                         '--log-file',
                         dest='log_file',
@@ -118,12 +112,11 @@ def main():
         fs_path                = args.fs_path
         test_file              = args.test_file
         ost_index              = args.ost_index
-        file_lfs_check_servers = args.file_lfs_check_servers
 
         logging.info('Started')
 
         try:
-            comp_states = lfs_utils.retrieve_component_states(file_lfs_check_servers)
+            comp_states = lfs_utils.retrieve_component_states()
             fs_states = comp_states[fs_name]
 
             logging.info(f"Count of MDTs: {len(fs_states.mdts)} - For file system: {fs_name}")
@@ -133,7 +126,7 @@ def main():
             logging.error(err)
 
         try:
-            logging.info(f"OST {ost_index} is active: {lfs_utils.is_ost_idx_active(fs_name, ost_index, file_lfs_check_servers)} - On file system: {fs_name}")
+            logging.info(f"OST {ost_index} is active: {lfs_utils.is_ost_idx_active(fs_name, ost_index)} - On file system: {fs_name}")
         except LfsUtilsError as err:
             logging.error(err)
 

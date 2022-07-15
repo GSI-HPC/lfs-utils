@@ -39,11 +39,15 @@ class TestLfsUtils(unittest.TestCase):
         self.assertEqual(len(comp_states['lustrefs2'].mdts), 3)
         self.assertEqual(len(comp_states['lustrefs2'].osts), 10)
 
-    # TODO: Refactor LfsUtils as Singleton class.
-    # def test_is_ost_idx_active(self):
+        self.assertEqual(comp_states['lustre'].osts[0].active, True)
+        self.assertEqual(comp_states['lustrefs2'].osts[3].active, False)
 
-    #     self.assertEqual(LfsUtils.is_ost_idx_active(target='lustre', idx=0), True)
-    #     self.assertEqual(LfsUtils.is_ost_idx_active(target='lustrefs2', idx=3), False)
+    def test_stripe_info(self):
+
+        stripe_info = LfsUtils.stripe_info(self=None, filename=None, file='lfs_getstripe.txt')
+
+        self.assertEqual(1, stripe_info.count)
+        self.assertEqual(542, stripe_info.index)
 
 class TestLfsUtilsMigration(unittest.TestCase):
 
@@ -110,3 +114,15 @@ class TestLfsUtilsMigration(unittest.TestCase):
 
         with self.assertRaises(LfsUtilsError):
             TestLfsUtilsMigration.create_migrate_result_with_no_time_elapsed(MigrateState.SUCCESS)
+
+    def test_migrate_result_creation(self):
+
+        with self.assertRaises(LfsUtilsError):
+            MigrateResult(None, 'test.tmp', timedelta(0))
+
+        with self.assertRaises(LfsUtilsError):
+            MigrateResult(MigrateState.SUCCESS, None, timedelta(0))
+
+        with self.assertRaises(LfsUtilsError):
+            MigrateResult(MigrateState.SUCCESS, 'test.tmp', None)
+

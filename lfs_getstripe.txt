@@ -1,0 +1,2 @@
+lmm_stripe_count:  1
+lmm_stripe_offset: 542

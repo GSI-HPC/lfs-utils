@@ -136,7 +136,7 @@ def main():
             logging.error(err)
 
         try:
-            lfs_utils.set_stripe(ost_index, test_file)
+            lfs_utils.set_ost_file_stripe(test_file, ost_index)
         except LfsUtilsError as err:
             logging.error(err)
 

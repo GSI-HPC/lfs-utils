@@ -19,7 +19,8 @@
 
 
 from enum import Enum
-from datetime import datetime
+from datetime import datetime, timedelta
+from typing import Dict
 
 import logging
 import os
@@ -32,8 +33,6 @@ import yaml
 VERSION='0.0.2'
 
 
-# TODO: Comment code...
-
 class LfsUtilsError(Exception):
     """Exception class LfsUtils specific errors."""
 
@@ -42,21 +41,13 @@ class LfsComponentType(str, Enum):
     MDT = 'MDT'
     OST = 'OST'
 
-class LfsComponentCollection:
-
-    def __init__(self) -> None:
-
-        self.mdts = {}
-        self.osts = {}
-
-
 class LfsComponentState:
 
-    def __init__(self, target, name, type, state, active):
+    def __init__(self, target: str, name: str, type_: str, state: str, active: str) -> None:
 
         self.target = target
         self.name = name
-        self.type = type
+        self.type = type_
         self.state = state
         self.active = active
         self.idx = name
@@ -69,6 +60,21 @@ class LfsComponentState:
     def idx(self, name):
         self._idx = int(name[3:], 16)
 
+class LfsComponentCollection:
+
+    def __init__(self) -> None:
+
+        self._mdts = {}
+        self._osts = {}
+
+    @property
+    def mdts(self) -> Dict[int, LfsComponentState]:
+        return self._mdts
+
+    @property
+    def osts(self) -> Dict[int, LfsComponentState]:
+        return self._osts
+
 class StripeField(str, Enum):
 
     LMM_STRIPE_COUNT = 'lmm_stripe_count'
@@ -76,11 +82,11 @@ class StripeField(str, Enum):
 
 class StripeInfo:
 
-    def __init__(self, filename, count, index):
+    def __init__(self, filename: str, count: int, index: int) -> None:
 
         self.filename = filename
-        self.count = count
-        self.index = index
+        self.count    = count
+        self.index    = index
 
 class MigrateState(str, Enum):
 
@@ -109,21 +115,20 @@ class MigrateResult:
     _result = ''
 
     @classmethod
-    def __conv_none__(cls, arg) -> str:
+    def __conv_none__(cls, arg: str) -> str:
 
         if arg is None:
             return ''
 
         return arg
 
-    def __init__(self, state, filename, time_elapsed, source_idx=None, target_idx=None, error_msg=None):
+    def __init__(self, state: MigrateState, filename: str, time_elapsed: timedelta, source_idx: str = None, target_idx: str = None, error_msg: str = None):
 
-        # TODO: Check on data types and value if required?
-        if filename is None or not filename:
-            raise LfsUtilsError('Argument filename must be set.')
+        if not filename or not isinstance(filename, str):
+            raise LfsUtilsError('Filename must be set and type of str')
 
-        if time_elapsed is None:
-            raise LfsUtilsError('Argument time_elapsed must be set.')
+        if not isinstance(time_elapsed, timedelta):
+            raise LfsUtilsError('Time elapsed must be type of datetime.timedelta')
 
         if MigrateState.DISPLACED == state:
 
@@ -155,6 +160,9 @@ class MigrateResult:
 
             self._result = f"{MigrateState.SUCCESS}|{filename}|{time_elapsed}|{source_index}|{target_index}"
 
+        else:
+            raise LfsUtilsError(f"Invalid state {state}")
+
     def __str__(self) -> str:
         return self._result
 
@@ -170,12 +178,12 @@ class LfsUtils:
     MIN_OST_INDEX = 0
     MAX_OST_INDEX = 65535
 
-    def __init__(self, lfs='/usr/bin/lfs', lctl='/usr/sbin/lctl'):
+    def __init__(self, lfs: str = '/usr/bin/lfs', lctl: str ='/usr/sbin/lctl') -> None:
 
         self.lfs = lfs
         self.lctl = lctl
 
-    def retrieve_component_states(self, file=None) -> dict:
+    def retrieve_component_states(self, file: str = None) -> Dict[str, LfsComponentCollection]:
 
         comp_states = {}
 
@@ -218,10 +226,7 @@ class LfsUtils:
                     handle_comp_type = LfsComponentType.MDT
                     handle_comp_state_col_item = comp_states[target].mdts
 
-                if state == 'active':
-                    active = True
-                else:
-                    active = False
+                active = ('active' == state)
 
                 comp_state_item = LfsComponentState(target, comp_name, handle_comp_type, state, active)
                 handle_comp_state_col_item[comp_state_item.idx] = comp_state_item
@@ -231,33 +236,27 @@ class LfsUtils:
 
         return comp_states
 
-    def is_ost_idx_active(self, target, idx, file=None) -> bool:
+    def is_ost_idx_active(self, target: str, idx: int, file=None) -> bool:
         return self.retrieve_component_states(file)[target].osts[idx].active
 
-    def set_stripe(self, ost_idx, file_path):
+    def set_ost_file_stripe(self, file_path: str, idx: int) -> None:
 
-        if ost_idx is None:
-            raise LfsUtilsError('Argument ost_idx is not set.')
+        if not file_path or not isinstance(file_path, str):
+            raise LfsUtilsError('File path must be set and type of str')
 
-        if file_path is None or not file_path:
-            raise LfsUtilsError('Argument file_path is not set.')
+        if idx is None or not isinstance(idx, int):
+            raise LfsUtilsError('Index must be set and type of int')
 
-        if not isinstance(ost_idx, int):
-            raise LfsUtilsError('Argument ost_idx must be type int.')
-
-        if not isinstance(file_path, str):
-            raise LfsUtilsError('Argument file_path must be type str.')
-
-        logging.debug("Setting stripe for file: %s - OST: %i", file_path, ost_idx)
+        logging.debug("Setting stripe for file: %s - OST: %i", file_path, idx)
 
         try:
-            args = [self.lfs, 'setstripe', '-i', str(ost_idx), file_path]
+            args = [self.lfs, 'setstripe', '-i', str(idx), file_path]
             subprocess.run(args, check=True, capture_output=True)
         except subprocess.CalledProcessError as err:
             # pylint: disable=W0707
             raise LfsUtilsError(err.stderr.decode('UTF-8'))
 
-    def stripe_info(self, filename) -> StripeInfo:
+    def stripe_info(self, filename: str, file: str = None) -> StripeInfo:
         """
         Raises
         ------
@@ -272,28 +271,29 @@ class LfsUtils:
         A StripeInfo object.
         """
 
-        args = [self.lfs, 'getstripe', '-c', '-i', '-y', filename]
-
-        result = subprocess.run(args, check=True, capture_output=True)
+        if file:
+            with open(file, 'r', encoding='UTF-8') as file_handle:
+                output = file_handle.read()
+        else:
+            args = [self.lfs, 'getstripe', '-c', '-i', '-y', filename]
+            output = subprocess.run(args, check=True, capture_output=True).stdout.decode('UTF-8')
 
         # TODO: Write a test that checks on dict type and content...
-        fields = yaml.safe_load(result.stdout)
+        fields = yaml.safe_load(output)
 
-        lmm_stripe_count = 0
         if StripeField.LMM_STRIPE_COUNT in fields:
             lmm_stripe_count = fields[StripeField.LMM_STRIPE_COUNT]
         else:
-            raise LfsUtilsError(f"Field {StripeField.LMM_STRIPE_COUNT} not found in stripe info: {result.stdout}")
+            raise LfsUtilsError(f"Field {StripeField.LMM_STRIPE_COUNT} not found in stripe info: {output}")
 
-        lmm_stripe_offset = 0
         if StripeField.LMM_STRIPE_OFFSET in fields:
             lmm_stripe_offset = fields[StripeField.LMM_STRIPE_OFFSET]
         else:
-            raise LfsUtilsError(f"Field {StripeField.LMM_STRIPE_OFFSET} not found in stripe info: {result.stdout}")
+            raise LfsUtilsError(f"Field {StripeField.LMM_STRIPE_OFFSET} not found in stripe info: {output}")
 
         return StripeInfo(filename, lmm_stripe_count, lmm_stripe_offset)
 
-    def migrate_file(self, filename, source_idx=None, target_idx=None, block=False, skip=True) -> MigrateResult:
+    def migrate_file(self, filename: str, source_idx: int = None, target_idx: int = None, block: bool = False, skip: bool = True) -> MigrateResult:
 
         state        = None
         pre_ost_idx  = None
@@ -361,7 +361,7 @@ class LfsUtils:
 
         return MigrateResult(state, filename, time_elapsed, pre_ost_idx, post_ost_idx, error_msg)
 
-    def retrieve_ost_fill_level(self, fs_path) -> dict:
+    def retrieve_ost_fill_level(self, fs_path: str) -> dict:
 
         ost_fill_level_dict = {}
 
@@ -395,7 +395,7 @@ class LfsUtils:
         return ost_fill_level_dict
 
     # TODO: Implement lookup in cache
-    def lookup_ost_to_oss(self, fs_name, ost, caching=True) -> str:
+    def lookup_ost_to_oss(self, fs_name: str, ost: int, caching: bool = True) -> str:
 
         hostname = ''
 
@@ -432,10 +432,10 @@ class LfsUtils:
 
         return hostname
 
-    def retrieve_ost_to_oss_map(self, fs_name, caching=True) -> dict:
+    def retrieve_ost_to_oss_map(self, fs_name: str, caching: bool = True) -> dict:
         pass
 
-    def is_ost_writable(self, ost, file_path) -> bool:
+    def is_ost_writable(self, ost: int, file_path: str) -> bool:
 
         if file_path is None:
             raise LfsUtilsError('File path must be set.')
@@ -451,7 +451,7 @@ class LfsUtils:
 
         try:
 
-            self.set_stripe(ost, file_path)
+            self.set_ost_file_stripe(file_path, ost)
 
             stripe_info = self.stripe_info(file_path)
 
@@ -462,10 +462,10 @@ class LfsUtils:
 
                 return True
 
-        except Exception as err:
-            logging.error(err)
+        except Exception:
+            logging.exception('Exception occured during OST writable test')
 
         return False
 
-    def create_dir_on_mdt(self, index, path):
+    def create_dir_on_mdt(self, index: int, path: str) -> None:
         pass

@@ -361,36 +361,38 @@ class LfsUtils:
 
         return MigrateResult(state, filename, time_elapsed, pre_ost_idx, post_ost_idx, error_msg)
 
-    def retrieve_ost_fill_level(self, fs_path: str) -> dict:
+    def retrieve_ost_disk_usage(self, fs_path: str, file: str = None) -> Dict[int, int]:
 
         ost_fill_level_dict = {}
 
         if not fs_path:
-            raise LfsUtilsError('Lustre file system path is not set!')
+            raise LfsUtilsError('Lustre file system path is not set')
 
-        try:
-
+        if file:
+            with open(file, 'r', encoding='UTF-8') as file_handle:
+                output = file_handle.read()
+        else:
             args = ['sudo', self.lfs, 'df', fs_path]
+            output = subprocess.run(args, check=True, capture_output=True).stdout.decode('UTF-8')
 
-            result = subprocess.run(args, check=True, capture_output=True)
+        for line in output.split('\n'):
 
-            for line in result.stdout.decode('UTF-8').strip().split('\n'):
+            stripped_line = line.strip()
 
-                match = LfsUtils._REGEX_PATTERN_OST_FILL_LEVEL.search(line.strip())
+            if not stripped_line:
+                continue
 
-                if match:
+            match = LfsUtils._REGEX_PATTERN_OST_FILL_LEVEL.search(stripped_line)
 
-                    fill_level = int(match.group(1))
-                    ost_idx = match.group(2)
+            if match:
 
-                    ost_fill_level_dict[ost_idx] = fill_level
+                fill_level = int(match.group(1))
+                ost_idx    = int(match.group(2))
 
-            if not ost_fill_level_dict:
-                raise LfsUtilsError('Lustre OST fill levels are empty!')
+                ost_fill_level_dict[ost_idx] = fill_level
 
-        except subprocess.CalledProcessError as err:
-            # pylint: disable=W0707
-            raise LfsUtilsError(err.stderr.decode('UTF-8'))
+        if not ost_fill_level_dict:
+            raise LfsUtilsError('Lustre OST fill levels are empty')
 
         return ost_fill_level_dict
 

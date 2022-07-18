@@ -29,6 +29,10 @@ class TestLfsUtils(unittest.TestCase):
         with self.assertRaises(LfsUtilsError):
             LfsUtils.lookup_ost_to_oss(self=None, fs_name='lustre-fs', ost=65566)
 
+    def test_retrieve_ost_fill_level(self):
+
+        ost_fill_level = LfsUtils.retrieve_ost_disk_usage(self=None, fs_path='/lustre', file='lfs_df.txt')
+
     def test_retrieve_component_states(self):
 
         comp_states = LfsUtils.retrieve_component_states(self=None, file='lfs_check_servers.txt')

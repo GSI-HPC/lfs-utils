@@ -115,56 +115,28 @@ def main():
 
         logging.info('Started')
 
-        try:
-            comp_states = lfs_utils.retrieve_component_states()
-            fs_states = comp_states[fs_name]
+        comp_states = lfs_utils.retrieve_component_states()
+        fs_states = comp_states[fs_name]
 
-            logging.info(f"Count of MDTs: {len(fs_states.mdts)} - For file system: {fs_name}")
-            logging.info(f"Count of OSTs: {len(fs_states.osts)} - For file system: {fs_name}")
+        logging.info(f"Count of MDTs: {len(fs_states.mdts)} - For file system: {fs_name}")
+        logging.info(f"Count of OSTs: {len(fs_states.osts)} - For file system: {fs_name}")
 
-        except LfsUtilsError as err:
-            logging.error(err)
+        logging.info(f"OST {ost_index} is active: {lfs_utils.is_ost_idx_active(fs_name, ost_index)} - On file system: {fs_name}")
 
-        try:
-            logging.info(f"OST {ost_index} is active: {lfs_utils.is_ost_idx_active(fs_name, ost_index)} - On file system: {fs_name}")
-        except LfsUtilsError as err:
-            logging.error(err)
+        logging.info(f"OST {ost_index} is writable: {lfs_utils.is_ost_writable(ost_index, test_file)}")
 
-        try:
-            logging.info(f"OST {ost_index} is writable: {lfs_utils.is_ost_writable(ost_index, test_file)}")
-        except LfsUtilsError as err:
-            logging.error(err)
+        lfs_utils.set_ost_file_stripe(test_file, ost_index)
 
-        try:
-            lfs_utils.set_ost_file_stripe(test_file, ost_index)
-        except LfsUtilsError as err:
-            logging.error(err)
+        stripe_info = lfs_utils.stripe_info(test_file)
+        logging.info(f"Stripe info for file: {stripe_info.filename} - OST index: {stripe_info.index} - Stripe count: {stripe_info.count}")
 
-        try:
-            stripe_info = lfs_utils.stripe_info(test_file)
-            logging.info(f"Stripe info for file: {stripe_info.filename} - OST index: {stripe_info.index} - Stripe count: {stripe_info.count}")
-        except LfsUtilsError as err:
-            logging.error(err)
+        logging.info(lfs_utils.migrate_file(test_file, ost_index, 0))
 
-        try:
-            logging.info(lfs_utils.migrate_file(test_file, ost_index, 0))
-        except LfsUtilsError as err:
-            logging.error(err)
+        logging.info(lfs_utils.migrate_file(test_file))
 
-        try:
-            logging.info(lfs_utils.migrate_file(test_file))
-        except LfsUtilsError as err:
-            logging.error(err)
+        logging.info(f"Size of OST fill level items: {len(lfs_utils.retrieve_ost_fill_level(fs_path))}")
 
-        try:
-            logging.info(f"Size of OST fill level items: {len(lfs_utils.retrieve_ost_fill_level(fs_path))}")
-        except LfsUtilsError as err:
-            logging.error(err)
-
-        try:
-            logging.info(f"Hostname for OST {ost_index} on file system {fs_name}: {lfs_utils.lookup_ost_to_oss(fs_name, ost_index)}")
-        except LfsUtilsError as err:
-            logging.error(err)
+        logging.info(f"Hostname for OST {ost_index} on file system {fs_name}: {lfs_utils.lookup_ost_to_oss(fs_name, ost_index)}")
 
         logging.info('Finished')
 

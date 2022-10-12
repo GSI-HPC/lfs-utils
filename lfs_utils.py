@@ -16,7 +16,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-
+#
+# https://github.com/gabrieleiannetti/lfs-utils
 
 from enum import Enum
 from datetime import datetime, timedelta
@@ -29,9 +30,7 @@ import socket
 import subprocess
 import yaml
 
-
-VERSION='0.0.2'
-
+VERSION = '0.0.3'
 
 class LfsUtilsError(Exception):
     """Exception class LfsUtils specific errors."""
@@ -40,6 +39,9 @@ class LfsComponentType(str, Enum):
 
     MDT = 'MDT'
     OST = 'OST'
+
+    def __str__(self) -> str:
+        return self.value
 
 class LfsComponentState:
 
@@ -80,6 +82,9 @@ class StripeField(str, Enum):
     LMM_STRIPE_COUNT = 'lmm_stripe_count'
     LMM_STRIPE_OFFSET = 'lmm_stripe_offset'
 
+    def __str__(self) -> str:
+        return self.value
+
 class StripeInfo:
 
     def __init__(self, filename: str, count: int, index: int) -> None:
@@ -95,6 +100,9 @@ class MigrateState(str, Enum):
     SKIPPED   = 'SKIPPED'
     SUCCESS   = 'SUCCESS'
     FAILED    = 'FAILED'
+
+    def __str__(self) -> str:
+        return self.value
 
 class MigrateResult:
     '''
@@ -249,12 +257,8 @@ class LfsUtils:
 
         logging.debug("Setting stripe for file: %s - OST: %i", file_path, idx)
 
-        try:
-            args = [self.lfs, 'setstripe', '-i', str(idx), file_path]
-            subprocess.run(args, check=True, capture_output=True)
-        except subprocess.CalledProcessError as err:
-            # pylint: disable=W0707
-            raise LfsUtilsError(err.stderr.decode('UTF-8'))
+        args = [self.lfs, 'setstripe', '-i', str(idx), file_path]
+        subprocess.run(args, check=True, capture_output=True)
 
     def stripe_info(self, filename: str, file: str = None) -> StripeInfo:
         """

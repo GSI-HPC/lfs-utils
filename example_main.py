@@ -134,7 +134,7 @@ def main():
 
         logging.info(lfs_utils.migrate_file(test_file))
 
-        logging.info(f"Size of OST fill level items: {len(lfs_utils.retrieve_ost_fill_level(fs_path))}")
+        logging.info(f"Size of OST fill level items: {len(lfs_utils.retrieve_ost_disk_usage(fs_path))}")
 
         logging.info(f"Hostname for OST {ost_index} on file system {fs_name}: {lfs_utils.lookup_ost_to_oss(fs_name, ost_index)}")
 

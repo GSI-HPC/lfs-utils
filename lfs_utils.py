@@ -32,6 +32,13 @@ import yaml
 
 VERSION = '0.0.3'
 
+def CONV_NONE(arg: str|None) -> str:
+
+    if arg == None:
+        return ''
+
+    return arg  # type: ignore
+
 class LfsUtilsError(Exception):
     """Exception class LfsUtils specific errors."""
 
@@ -45,29 +52,26 @@ class LfsComponentType(str, Enum):
 
 class LfsComponentState:
 
-    def __init__(self, target: str, name: str, type_: str, state: str, active: str) -> None:
+    def __init__(self, target: str, name: str, type_: str, state: str, active: bool) -> None:
 
         self.target = target
-        self.name = name
-        self.type = type_
-        self.state = state
+        self.name   = name
+        self.type   = type_
+        self.state  = state
         self.active = active
-        self.idx = name
+
+        self._idx    = int(name[3:], 16)
 
     @property
-    def idx(self):
+    def idx(self) -> int:
         return self._idx
-
-    @idx.setter
-    def idx(self, name):
-        self._idx = int(name[3:], 16)
 
 class LfsComponentCollection:
 
     def __init__(self) -> None:
 
-        self._mdts = {}
-        self._osts = {}
+        self._mdts = dict[int, LfsComponentState]()
+        self._osts = dict[int, LfsComponentState]()
 
     @property
     def mdts(self) -> Dict[int, LfsComponentState]:
@@ -120,17 +124,9 @@ class MigrateResult:
       - if migration of file was successful
     '''
 
-    _result = ''
+    def __init__(self, state: MigrateState, filename: str, time_elapsed: timedelta, source_idx: int|None = None, target_idx: int|None = None, error_msg: str = None):
 
-    @classmethod
-    def __conv_none__(cls, arg: str) -> str:
-
-        if arg is None:
-            return ''
-
-        return arg
-
-    def __init__(self, state: MigrateState, filename: str, time_elapsed: timedelta, source_idx: str = None, target_idx: str = None, error_msg: str = None):
+        self._result: str
 
         if not filename or not isinstance(filename, str):
             raise LfsUtilsError('Filename must be set and type of str')
@@ -139,21 +135,14 @@ class MigrateResult:
             raise LfsUtilsError('Time elapsed must be type of datetime.timedelta')
 
         if MigrateState.DISPLACED == state:
-
-            source_index = __class__.__conv_none__(source_idx)
-            target_index = __class__.__conv_none__(target_idx)
-
-            self._result = f"{MigrateState.DISPLACED}|{filename}|{time_elapsed}|{source_index}|{target_index}"
+            self._result = f"{MigrateState.DISPLACED}|{filename}|{time_elapsed}|{CONV_NONE(source_idx)}|{CONV_NONE(target_idx)}"
 
         elif MigrateState.FAILED == state:
 
             if not error_msg:
                 raise LfsUtilsError(f"State {MigrateState.FAILED} requires error_msg to be set.")
 
-            source_index = __class__.__conv_none__(source_idx)
-            target_index = __class__.__conv_none__(target_idx)
-
-            self._result = f"{MigrateState.FAILED}|{filename}|{time_elapsed}|{source_index}|{target_index}|{error_msg}"
+            self._result = f"{MigrateState.FAILED}|{filename}|{time_elapsed}|{CONV_NONE(source_idx)}|{CONV_NONE(target_idx)}|{error_msg}"
 
         elif MigrateState.IGNORED == state:
             self._result = f"{MigrateState.IGNORED}|{filename}"
@@ -162,11 +151,7 @@ class MigrateResult:
             self._result = f"{MigrateState.SKIPPED}|{filename}"
 
         elif state == MigrateState.SUCCESS:
-
-            source_index = __class__.__conv_none__(source_idx)
-            target_index = __class__.__conv_none__(target_idx)
-
-            self._result = f"{MigrateState.SUCCESS}|{filename}|{time_elapsed}|{source_index}|{target_index}"
+            self._result = f"{MigrateState.SUCCESS}|{filename}|{time_elapsed}|{CONV_NONE(source_idx)}|{CONV_NONE(target_idx)}"
 
         else:
             raise LfsUtilsError(f"Invalid state {state}")
@@ -193,7 +178,7 @@ class LfsUtils:
 
     def retrieve_component_states(self, file: str = None) -> Dict[str, LfsComponentCollection]:
 
-        comp_states = {}
+        comp_states = dict[str, LfsComponentCollection]()
 
         if file:
             with open(file, 'r', encoding='UTF-8') as file_handle:
@@ -224,19 +209,16 @@ class LfsUtils:
                 if target not in comp_states:
                     comp_states[target] = LfsComponentCollection()
 
-                if LfsComponentType.OST == comp_type:
-
-                    handle_comp_type = LfsComponentType.OST
+                if comp_type == LfsComponentType.OST:
                     handle_comp_state_col_item = comp_states[target].osts
-
-                else:
-
-                    handle_comp_type = LfsComponentType.MDT
+                elif comp_type == LfsComponentType.MDT:
                     handle_comp_state_col_item = comp_states[target].mdts
+                else:
+                    raise RuntimeError(f"Unknown component type found: {comp_type}")
 
                 active = ('active' == state)
 
-                comp_state_item = LfsComponentState(target, comp_name, handle_comp_type, state, active)
+                comp_state_item = LfsComponentState(target, comp_name, comp_type, state, active)
                 handle_comp_state_col_item[comp_state_item.idx] = comp_state_item
 
             else:

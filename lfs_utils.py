@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# Copyright 2021 Gabriele Iannetti <g.iannetti@gsi.de>
+# Copyright 2022 Gabriele Iannetti <g.iannetti@gsi.de>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,6 +21,7 @@
 
 from enum import Enum
 from datetime import datetime, timedelta
+from types import NoneType
 from typing import Dict
 
 import logging
@@ -32,12 +33,20 @@ import yaml
 
 VERSION = '0.0.3'
 
-def CONV_NONE(arg: str|None) -> str:
+def CONV_OBJ(arg: int|str|None) -> str:
+    """Support convertion from int, str and None objects to str.
 
-    if arg == None:
+    None objects are converted to empty string.
+    """
+
+    if isinstance(arg, NoneType):
         return ''
-
-    return arg  # type: ignore
+    elif isinstance(arg, str):
+        return arg
+    elif isinstance(arg, int):
+        return str(arg)
+    else:
+        raise TypeError(f"Argument of type {type(arg)} not supported")
 
 class LfsUtilsError(Exception):
     """Exception class LfsUtils specific errors."""
@@ -135,14 +144,14 @@ class MigrateResult:
             raise LfsUtilsError('Time elapsed must be type of datetime.timedelta')
 
         if MigrateState.DISPLACED == state:
-            self._result = f"{MigrateState.DISPLACED}|{filename}|{time_elapsed}|{CONV_NONE(source_idx)}|{CONV_NONE(target_idx)}"
+            self._result = f"{MigrateState.DISPLACED}|{filename}|{time_elapsed}|{CONV_OBJ(source_idx)}|{CONV_OBJ(target_idx)}"
 
         elif MigrateState.FAILED == state:
 
             if not error_msg:
                 raise LfsUtilsError(f"State {MigrateState.FAILED} requires error_msg to be set.")
 
-            self._result = f"{MigrateState.FAILED}|{filename}|{time_elapsed}|{CONV_NONE(source_idx)}|{CONV_NONE(target_idx)}|{error_msg}"
+            self._result = f"{MigrateState.FAILED}|{filename}|{time_elapsed}|{CONV_OBJ(source_idx)}|{CONV_OBJ(target_idx)}|{error_msg}"
 
         elif MigrateState.IGNORED == state:
             self._result = f"{MigrateState.IGNORED}|{filename}"
@@ -151,7 +160,7 @@ class MigrateResult:
             self._result = f"{MigrateState.SKIPPED}|{filename}"
 
         elif state == MigrateState.SUCCESS:
-            self._result = f"{MigrateState.SUCCESS}|{filename}|{time_elapsed}|{CONV_NONE(source_idx)}|{CONV_NONE(target_idx)}"
+            self._result = f"{MigrateState.SUCCESS}|{filename}|{time_elapsed}|{CONV_OBJ(source_idx)}|{CONV_OBJ(target_idx)}"
 
         else:
             raise LfsUtilsError(f"Invalid state {state}")

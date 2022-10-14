@@ -10,7 +10,7 @@
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
@@ -54,6 +54,17 @@ class TestLfsUtils(unittest.TestCase):
 
         self.assertEqual(1, stripe_info.count)
         self.assertEqual(542, stripe_info.index)
+
+    def test_conv_obj(self):
+
+        from lfs_utils import CONV_OBJ
+
+        self.assertEqual(CONV_OBJ(None), '')
+        self.assertEqual(CONV_OBJ(45), '45')
+        self.assertEqual(CONV_OBJ('SUCCESS'), 'SUCCESS')
+
+        with self.assertRaises(TypeError):
+            CONV_OBJ(12.7)
 
 class TestLfsUtilsMigration(unittest.TestCase):
 
@@ -131,4 +142,3 @@ class TestLfsUtilsMigration(unittest.TestCase):
 
         with self.assertRaises(LfsUtilsError):
             MigrateResult(MigrateState.SUCCESS, 'test.tmp', None)
-

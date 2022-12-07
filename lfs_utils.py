@@ -33,7 +33,7 @@ import yaml
 
 VERSION = '0.0.3'
 
-def CONV_OBJ(arg: int|str|None) -> str:
+def conv_obj(arg: int|str|None) -> str:
     """Support convertion from int, str and None objects to str.
 
     None objects are converted to empty string.
@@ -41,12 +41,12 @@ def CONV_OBJ(arg: int|str|None) -> str:
 
     if isinstance(arg, NoneType):
         return ''
-    elif isinstance(arg, str):
+    if isinstance(arg, str):
         return arg
-    elif isinstance(arg, int):
+    if isinstance(arg, int):
         return str(arg)
-    else:
-        raise TypeError(f"Argument of type {type(arg)} not supported")
+
+    raise TypeError(f"Argument of type {type(arg)} not supported")
 
 class LfsUtilsError(Exception):
     """Exception class LfsUtils specific errors."""
@@ -69,7 +69,7 @@ class LfsComponentState:
         self.state  = state
         self.active = active
 
-        self._idx    = int(name[3:], 16)
+        self._idx = int(name[3:], 16)
 
     @property
     def idx(self) -> int:
@@ -133,7 +133,13 @@ class MigrateResult:
       - if migration of file was successful
     '''
 
-    def __init__(self, state: MigrateState, filename: str, time_elapsed: timedelta, source_idx: int|None = None, target_idx: int|None = None, error_msg: str = None):
+    def __init__(self,
+                 state: MigrateState,
+                 filename: str,
+                 time_elapsed: timedelta,
+                 source_idx: int|None = None,
+                 target_idx: int|None = None,
+                 error_msg: str = None):
 
         self._result: str
 
@@ -144,14 +150,14 @@ class MigrateResult:
             raise LfsUtilsError('Time elapsed must be type of datetime.timedelta')
 
         if MigrateState.DISPLACED == state:
-            self._result = f"{MigrateState.DISPLACED}|{filename}|{time_elapsed}|{CONV_OBJ(source_idx)}|{CONV_OBJ(target_idx)}"
+            self._result = f"{MigrateState.DISPLACED}|{filename}|{time_elapsed}|{conv_obj(source_idx)}|{conv_obj(target_idx)}"
 
         elif MigrateState.FAILED == state:
 
             if not error_msg:
                 raise LfsUtilsError(f"State {MigrateState.FAILED} requires error_msg to be set.")
 
-            self._result = f"{MigrateState.FAILED}|{filename}|{time_elapsed}|{CONV_OBJ(source_idx)}|{CONV_OBJ(target_idx)}|{error_msg}"
+            self._result = f"{MigrateState.FAILED}|{filename}|{time_elapsed}|{conv_obj(source_idx)}|{conv_obj(target_idx)}|{error_msg}"
 
         elif MigrateState.IGNORED == state:
             self._result = f"{MigrateState.IGNORED}|{filename}"
@@ -160,7 +166,7 @@ class MigrateResult:
             self._result = f"{MigrateState.SKIPPED}|{filename}"
 
         elif state == MigrateState.SUCCESS:
-            self._result = f"{MigrateState.SUCCESS}|{filename}|{time_elapsed}|{CONV_OBJ(source_idx)}|{CONV_OBJ(target_idx)}"
+            self._result = f"{MigrateState.SUCCESS}|{filename}|{time_elapsed}|{conv_obj(source_idx)}|{conv_obj(target_idx)}"
 
         else:
             raise LfsUtilsError(f"Invalid state {state}")
@@ -180,7 +186,7 @@ class LfsUtils:
     MIN_OST_INDEX = 0
     MAX_OST_INDEX = 65535
 
-    def __init__(self, lfs: str = '/usr/bin/lfs', lctl: str ='/usr/sbin/lctl') -> None:
+    def __init__(self, lfs: str = '/usr/bin/lfs', lctl: str ='/usr/sbin/lctl'):
 
         self.lfs = lfs
         self.lctl = lctl
@@ -273,7 +279,6 @@ class LfsUtils:
             args = [self.lfs, 'getstripe', '-c', '-i', '-y', filename]
             output = subprocess.run(args, check=True, capture_output=True).stdout.decode('UTF-8')
 
-        # TODO: Write a test that checks on dict type and content...
         fields = yaml.safe_load(output)
 
         if StripeField.LMM_STRIPE_COUNT in fields:
@@ -288,7 +293,12 @@ class LfsUtils:
 
         return StripeInfo(filename, lmm_stripe_count, lmm_stripe_offset)
 
-    def migrate_file(self, filename: str, source_idx: int = None, target_idx: int = None, block: bool = False, skip: bool = True) -> MigrateResult:
+    def migrate_file(self,
+                     filename: str,
+                     source_idx: int|None = None,
+                     target_idx: int|None = None,
+                     block: bool = False,
+                     skip: bool = True) -> MigrateResult:
 
         state        = None
         pre_ost_idx  = None
@@ -299,16 +309,23 @@ class LfsUtils:
 
         try:
 
+            if source_idx and not isinstance(source_idx, int):
+                raise TypeError('If source_idx ist set, it must be type of int')
+
+            if target_idx and not isinstance(target_idx, int):
+                raise TypeError('If target_idx ist set, it must be type of int')
+
             pre_stripe_info = self.stripe_info(filename)
 
             pre_ost_idx = pre_stripe_info.index
 
             if skip and pre_stripe_info.count > 1:
                 state = MigrateState.SKIPPED
-            elif source_idx is not None and pre_ost_idx != source_idx:
+            elif source_idx != pre_ost_idx:
                 state = MigrateState.IGNORED
-            elif target_idx is not None and pre_ost_idx == target_idx:
+            elif target_idx == pre_ost_idx:
                 state = MigrateState.IGNORED
+
             else:
 
                 args = [self.lfs, 'migrate']
@@ -318,8 +335,14 @@ class LfsUtils:
                 else:
                     args.append('--non-block')
 
-                # TODO: Check OST min and max index
-                if target_idx is not None and target_idx >= 0:
+                if target_idx:
+
+                    if target_idx < LfsUtils.MIN_OST_INDEX:
+                        raise ValueError(f"target_idx is less than LfsUtils.MIN_OST_INDEX ({LfsUtils.MIN_OST_INDEX})")
+
+                    if source_idx > LfsUtils.MAX_OST_INDEX:
+                        raise ValueError(f"target_idx is greater than LfsUtils.MAX_OST_INDEX ({LfsUtils.MAX_OST_INDEX})")
+
                     args.append('-i')
                     args.append(str(target_idx))
 
@@ -336,7 +359,7 @@ class LfsUtils:
 
                 post_ost_idx = self.stripe_info(filename).index
 
-                if target_idx is not None and target_idx != post_ost_idx:
+                if target_idx != post_ost_idx:
                     state = MigrateState.DISPLACED
                 else:
                     state = MigrateState.SUCCESS

@@ -2,3 +2,4 @@ __init.py__
 __pycache__
 *.pyc
 .vscode
+.mypy_cache

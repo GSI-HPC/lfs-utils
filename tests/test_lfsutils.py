@@ -20,7 +20,7 @@
 import unittest
 
 from datetime import timedelta
-from lfs_utils import LfsUtils, LfsUtilsError, MigrateResult, MigrateState
+from lfs_utils.lfsutils import LfsUtils, LfsUtilsError, MigrateResult, MigrateState
 
 class TestLfsUtils(unittest.TestCase):
 
@@ -57,14 +57,14 @@ class TestLfsUtils(unittest.TestCase):
 
     def test_conv_obj(self):
 
-        from lfs_utils import CONV_OBJ
+        from lfs_utils.lfsutils import conv_obj
 
-        self.assertEqual(CONV_OBJ(None), '')
-        self.assertEqual(CONV_OBJ(45), '45')
-        self.assertEqual(CONV_OBJ('SUCCESS'), 'SUCCESS')
+        self.assertEqual(conv_obj(None), '')
+        self.assertEqual(conv_obj(45), '45')
+        self.assertEqual(conv_obj('SUCCESS'), 'SUCCESS')
 
         with self.assertRaises(TypeError):
-            CONV_OBJ(12.7)
+            conv_obj(12.7)
 
 class TestLfsUtilsMigration(unittest.TestCase):
 

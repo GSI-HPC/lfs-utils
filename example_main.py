@@ -22,8 +22,7 @@ import argparse
 import logging
 
 from minimal_python import MinimalPython
-from lfs_utils import LfsUtils
-
+from lfs_utils.lfsutils import LfsUtils
 
 def init_arg_parser():
 
@@ -34,7 +33,7 @@ def init_arg_parser():
                         dest='fs_name',
                         required=True,
                         type=str,
-                        help='Specify file system name.')
+                        help='Specify file system name')
 
     parser.add_argument('-p',
                         '--fs-path',
@@ -42,14 +41,14 @@ def init_arg_parser():
                         required=False,
                         type=str,
                         default='/lustre',
-                        help='Specify file system path.')
+                        help='Specify file system path')
 
     parser.add_argument('-t',
                         '--test-file',
                         dest='test_file',
                         required=True,
                         type=str,
-                        help='Specify test file.')
+                        help='Specify test file')
 
     parser.add_argument('-o',
                         '--ost-index',
@@ -57,28 +56,21 @@ def init_arg_parser():
                         required=False,
                         type=int,
                         default=3,
-                        help='Specify ost index.')
+                        help='Specify ost index')
 
     parser.add_argument('-l',
                         '--log-file',
                         dest='log_file',
                         required=False,
                         type=str,
-                        help='Specify log file.')
+                        help='Specify log file')
 
     parser.add_argument('-D',
                         '--debug',
                         dest='enable_debug',
                         required=False,
                         action='store_true',
-                        help='Enable debug.')
-
-    parser.add_argument('-v',
-                        '--version',
-                        dest='print_version',
-                        required=False,
-                        action='store_true',
-                        help='Print library version number.')
+                        help='Enable debug')
 
     return parser.parse_args()
 

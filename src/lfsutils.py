@@ -15,9 +15,6 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-#
-#
-# https://github.com/gabrieleiannetti/lfs-utils
 
 from enum import Enum
 from datetime import datetime, timedelta
@@ -31,7 +28,7 @@ import socket
 import subprocess
 import yaml
 
-VERSION = '0.0.3'
+VERSION = '1.0.0'
 
 def conv_obj(arg: int|str|None) -> str:
     """Support convertion from int, str and None objects to str.

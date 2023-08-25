@@ -1,6 +1,6 @@
 # lfs-utils
 
-A Lustre Utility Tool and Library in Python
+A [Lustre](https://www.lustre.org/) Utility Tool and Library in Python
 
 ## Requirements
 

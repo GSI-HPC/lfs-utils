@@ -28,8 +28,6 @@ import socket
 import subprocess
 import yaml
 
-VERSION = '1.0.0'
-
 def conv_obj(arg: int|str|None) -> str:
     """Support convertion from int, str and None objects to str.
 

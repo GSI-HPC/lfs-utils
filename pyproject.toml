@@ -17,13 +17,12 @@ classifiers = [
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Operating System :: POSIX",
     "Topic :: Utilities",
+    "Topic :: System :: Filesystems",
 ]
 
 [project.urls]
-homepage = "https://github.com/GSI-HPC/lfs-utils"
-repository = "https://github.com/GSI-HPC/lfs-utils"
-issues = "https://github.com/GSI-HPC/lfs-utils/issues"
-readme = "README.md"
+Homepage = "https://github.com/GSI-HPC/lfs-utils"
+Repository = "https://github.com/GSI-HPC/lfs-utils"
 
 [build-system]
 requires = ["hatchling"]

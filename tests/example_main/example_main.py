@@ -22,7 +22,7 @@ import argparse
 import logging
 
 from minimal_python import MinimalPython
-from lfs_utils.lfsutils import LfsUtils
+from lfsutils import LfsUtils
 
 def init_arg_parser():
 

@@ -1,6 +1,6 @@
 [project]
 name = "lfsutils"
-version = "1.0.0"
+version = "1.0.1"
 authors = [
   { name="Gabriele Iannetti", email="g.iannetti@gsi.de" },
 ]

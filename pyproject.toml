@@ -4,7 +4,7 @@ version = "1.0.1"
 authors = [
   { name="Gabriele Iannetti", email="g.iannetti@gsi.de" },
 ]
-description = "A Lustre Utility Library"
+description = "A Utility Library for the Lustre filesystem"
 license = "GPL-3.0"
 readme = "README.md"
 requires-python = ">=3.10.0"

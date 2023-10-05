@@ -17,11 +17,19 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-
 import argparse
 import logging
+import sys
+import os
+
+from pathlib import PurePosixPath
 
 from minimal_python import MinimalPython
+
+def load_lfsutils_module_from_local_path():
+    sys.path.append(PurePosixPath(os.path.dirname(os.path.realpath(__file__))).parents[1].as_posix())
+
+load_lfsutils_module_from_local_path()
 from lfsutils import LfsUtils
 
 def init_arg_parser():

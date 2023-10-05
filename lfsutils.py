@@ -171,10 +171,12 @@ class MigrateResult:
 
 class LfsUtils:
 
+    _REGEX_STR_OST_HEX = r"^[0-9a-fA-F]{4}$"
     _REGEX_STR_COMP_STATE = r"(.+)\-((OST|MDT){1}[a-z0-9]+)\-[a-z0-9-]+\s(.+)\."
     _REGEX_STR_OST_FILL_LEVEL = r"(\d{1,3})%.*\[OST:([0-9]{1,4})\]"
     _REGEX_STR_OST_CONN_UUID = r"ost_conn_uuid=([\d\.]+)@"
 
+    _REGEX_PATTERN_OST_HEX = re.compile(_REGEX_STR_OST_HEX)
     _REGEX_PATTERN_OST_FILL_LEVEL = re.compile(_REGEX_STR_OST_FILL_LEVEL)
     _REGEX_PATTERN_OST_CONN_UUID = re.compile(_REGEX_STR_OST_CONN_UUID)
 
@@ -185,6 +187,31 @@ class LfsUtils:
 
         self.lfs = lfs
         self.lctl = lctl
+
+    # TODO: Write pydoc
+    def to_ost_hex(ost: int|str) -> str:
+
+        if isinstance(ost, str):
+
+            match = LfsUtils._REGEX_PATTERN_OST_HEX.match(ost)
+
+            if not match:
+                raise RuntimeError(f"Value for hex OST is invalid: '{ost}'")
+
+            return ost
+
+        elif isinstance(ost, int):
+
+            number = int(ost)
+
+            if number < LfsUtils.MIN_OST_INDEX or number > LfsUtils.MAX_OST_INDEX:
+                raise LfsUtilsError(f"OST index {number} invalid. Must be in range between {LfsUtils.MIN_OST_INDEX} and {LfsUtils.MAX_OST_INDEX}.")
+
+            return hex(number).split('x')[-1].zfill(4)
+
+        else:
+            raise TypeError(f"Unsupported type found{type(ost)} - Must be of type int or str for OST index.")
+
 
     def retrieve_component_states(self, file: str = None) -> Dict[str, LfsComponentCollection]:
 
@@ -414,15 +441,11 @@ class LfsUtils:
 
         return ost_fill_level_dict
 
-    # TODO: Implement lookup in cache
-    def lookup_ost_to_oss(self, fs_name: str, ost: int, caching: bool = True) -> str:
+    def lookup_ost_to_oss(self, fs_name: str, ost: int|str) -> str:
 
         hostname = ''
 
-        if ost < LfsUtils.MIN_OST_INDEX or ost > LfsUtils.MAX_OST_INDEX:
-            raise LfsUtilsError(f"OST index {ost} invalid. Must be in range between {LfsUtils.MIN_OST_INDEX} and {LfsUtils.MAX_OST_INDEX}.")
-
-        ost_hex = hex(ost).split('x')[-1].zfill(4)
+        ost_hex = LfsUtils.to_ost_hex(ost)
 
         param_value = f"osc.{fs_name}-OST{ost_hex}*.ost_conn_uuid"
 
@@ -452,8 +475,15 @@ class LfsUtils:
 
         return hostname
 
-    def retrieve_ost_to_oss_map(self, fs_name: str, caching: bool = True) -> dict:
-        pass
+    def retrieve_ost_to_oss_map(self, fs_name: str) -> dict[str:str]:
+
+        param_value = f"osc.{fs_name}-OST*.ost_conn_uuid"
+
+        args = [self.lctl, 'get_param', param_value]
+
+        result = subprocess.run(args, check=True, capture_output=True)
+
+        TODO: Parse result and build map
 
     def is_ost_writable(self, ost: int, file_path: str) -> bool:
 

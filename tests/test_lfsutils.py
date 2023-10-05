@@ -17,9 +17,19 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import sys
+import os
 import unittest
 
 from datetime import timedelta
+from pathlib import PurePosixPath
+
+def load_lfsutils_module_from_local_path():
+    sys.path.append(PurePosixPath(os.path.dirname(os.path.realpath(__file__))).parents[0].as_posix())
+
+load_lfsutils_module_from_local_path()
+
+import lfsutils
 from lfsutils import LfsUtils, LfsUtilsError, MigrateResult, MigrateState
 
 class TestLfsUtils(unittest.TestCase):
@@ -57,14 +67,23 @@ class TestLfsUtils(unittest.TestCase):
 
     def test_conv_obj(self):
 
-        from lfsutils import conv_obj
-
-        self.assertEqual(conv_obj(None), '')
-        self.assertEqual(conv_obj(45), '45')
-        self.assertEqual(conv_obj('SUCCESS'), 'SUCCESS')
+        self.assertEqual(lfsutils.conv_obj(None), '')
+        self.assertEqual(lfsutils.conv_obj(45), '45')
+        self.assertEqual(lfsutils.conv_obj('SUCCESS'), 'SUCCESS')
 
         with self.assertRaises(TypeError):
-            conv_obj(12.7)
+            lfsutils.conv_obj(12.7)
+
+    def test_to_ost_hex(self):
+
+        self.assertEqual(LfsUtils.to_ost_hex('001a'), '001a')
+        self.assertEqual(LfsUtils.to_ost_hex(12), '000c')
+
+        with self.assertRaises(RuntimeError):
+            LfsUtils.to_ost_hex('45')
+
+        with self.assertRaises(TypeError):
+            LfsUtils.to_ost_hex(67.32)
 
 class TestLfsUtilsMigration(unittest.TestCase):
 

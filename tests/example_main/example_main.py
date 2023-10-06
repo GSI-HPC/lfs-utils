@@ -17,12 +17,12 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from pathlib import PurePosixPath
+
 import argparse
 import logging
 import sys
 import os
-
-from pathlib import PurePosixPath
 
 from minimal_python import MinimalPython
 
@@ -138,6 +138,9 @@ def main():
         logging.info(f"Size of OST fill level items: {len(lfs_utils.retrieve_ost_disk_usage(fs_path))}")
 
         logging.info(f"Hostname for OST {ost_index} on file system {fs_name}: {lfs_utils.lookup_ost_to_oss(fs_name, ost_index)}")
+
+        # TODO: add debug message
+        lfs_utils.lookup_ost_rangeset_to_oss(fs_name, "0-9,12,87")
 
         logging.info('Finished')
 

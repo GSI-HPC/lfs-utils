@@ -28,6 +28,8 @@ import socket
 import subprocess
 import yaml
 
+from ClusterShell.RangeSet import RangeSet
+
 def conv_obj(arg: int|str|None) -> str:
     """Support convertion from int, str and None objects to str.
 
@@ -482,7 +484,7 @@ class LfsUtils:
             if not stripped_line:
                 continue
 
-            match = LfsUtils._REGEX_PATTERN_OST_CONN_UUID.search(output)
+            match = LfsUtils._REGEX_PATTERN_OST_CONN_UUID.search(line)
 
             if not match:
                 raise LfsUtilsError(f"No match for ost_conn_uuid on filesystem {fs_name}")
@@ -497,15 +499,14 @@ class LfsUtils:
 
         return ost_conn_uuid_dict
 
-    def lookup_ost_to_oss(self, fs_name: str, ost: int|str) -> str:
+    def resolve_ost_conn_uid(fs_name: str, ost_conn_uuid: str) -> str:
 
-        hostname = ''
+        # TODO: check for input arg not empty
 
-        ip_addr = self.ost_conn_uuid(fs_name, ost)
-        host_info = socket.gethostbyaddr(ip_addr)
+        host_info = socket.gethostbyaddr(ost_conn_uuid)
 
         if not host_info:
-            raise LfsUtilsError(f"No host information retrieved from socket.gethostbyaddr() for IP addr {ip_addr}")
+            raise LfsUtilsError(f"No host information retrieved from socket.gethostbyaddr() for IP addr {ost_conn_uuid}")
 
         if len(host_info) != 3:
             raise LfsUtilsError(f"Broken interface for value {host_info} on socket.gethostbyaddr()")
@@ -513,9 +514,20 @@ class LfsUtils:
         hostname = host_info[0]
 
         if not hostname:
-            raise LfsUtilsError(f"No hostname found for OST {ost} on filesystem {fs_name}")
+            raise LfsUtilsError(f"No hostname found for ost_conn_uuid {ost_conn_uuid} on filesystem {fs_name}")
 
         return hostname
+
+    def lookup_ost_to_oss(self, fs_name: str, ost: int|str) -> str:
+        return LfsUtils.resolve_ost_conn_uid(fs_name, self.ost_conn_uuid(fs_name, ost))
+
+    def lookup_ost_rangeset_to_oss(self, fs_name: str, ost_rangeset: str) -> Dict[str, str]:
+
+        ost_conn_uuids = self.ost_conn_uuid_map(fs_name)
+
+        # for ost_dec in RangeSet(ost_rangeset).striter():
+
+        #     ost_conn_uuid_map[LfsUtils.to_ost_hex(int(ost_dec))]
 
     def is_ost_writable(self, ost: int, file_path: str) -> bool:
 

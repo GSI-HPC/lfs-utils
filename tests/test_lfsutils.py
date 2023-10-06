@@ -17,20 +17,20 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from datetime import timedelta
+from pathlib import PurePosixPath
+
 import sys
 import os
 import unittest
-
-from datetime import timedelta
-from pathlib import PurePosixPath
 
 def load_lfsutils_module_from_local_path():
     sys.path.append(PurePosixPath(os.path.dirname(os.path.realpath(__file__))).parents[0].as_posix())
 
 load_lfsutils_module_from_local_path()
 
-import lfsutils
 from lfsutils import LfsUtils, LfsUtilsError, MigrateResult, MigrateState
+import lfsutils
 
 class TestLfsUtils(unittest.TestCase):
 

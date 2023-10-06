@@ -174,7 +174,7 @@ class LfsUtils:
     _REGEX_STR_OST_HEX = r"^[0-9a-fA-F]{4}$"
     _REGEX_STR_COMP_STATE = r"(.+)\-((OST|MDT){1}[a-z0-9]+)\-[a-z0-9-]+\s(.+)\."
     _REGEX_STR_OST_FILL_LEVEL = r"(\d{1,3})%.*\[OST:([0-9]{1,4})\]"
-    _REGEX_STR_OST_CONN_UUID = r"ost_conn_uuid=([\d\.]+)@"
+    _REGEX_STR_OST_CONN_UUID = r"osc\..*-OST([0-9a-fA-F]{4})-osc-[0-9a-fA-F]{16}\.ost_conn_uuid=([\d\.]+)@"
 
     _REGEX_PATTERN_OST_HEX = re.compile(_REGEX_STR_OST_HEX)
     _REGEX_PATTERN_OST_FILL_LEVEL = re.compile(_REGEX_STR_OST_FILL_LEVEL)
@@ -411,7 +411,7 @@ class LfsUtils:
         ost_fill_level_dict = {}
 
         if not fs_path:
-            raise LfsUtilsError('Lustre file system path is not set')
+            raise LfsUtilsError('Lustre filesystem path is not set')
 
         if file:
             with open(file, 'r', encoding='UTF-8') as file_handle:
@@ -437,29 +437,71 @@ class LfsUtils:
                 ost_fill_level_dict[ost_idx] = fill_level
 
         if not ost_fill_level_dict:
-            raise LfsUtilsError('Lustre OST fill levels are empty')
+            raise LfsUtilsError(f"Lustre OST fill levels are empty for filesystem path {fs_path}")
 
         return ost_fill_level_dict
+
+    def ost_conn_uuid(self, fs_name: str, ost: int|str) -> str:
+
+        conn_uuid = ''
+
+        if not fs_name:
+            raise LfsUtilsError('Lustre filesystem name is not set')
+
+        param_value = f"osc.{fs_name}-OST{LfsUtils.to_ost_hex(ost)}-osc-*.ost_conn_uuid"
+        args = [self.lctl, 'get_param', param_value]
+        output = subprocess.run(args, check=True, capture_output=True).stdout.decode('UTF-8')
+
+        match = LfsUtils._REGEX_PATTERN_OST_CONN_UUID.search(output)
+
+        if not match:
+            raise LfsUtilsError(f"No match for OST {ost} on filesystem {fs_name}")
+
+        conn_uuid = match.group(2)
+
+        if not conn_uuid:
+            raise LfsUtilsError(f"No conn_uuid found for OST {ost} on filesystem {fs_name}")
+
+        return conn_uuid
+
+    def ost_conn_uuid_map(self, fs_name: str) -> Dict[str, str]:
+
+        ost_conn_uuid_dict = {}
+
+        if not fs_name:
+            raise LfsUtilsError('Lustre filesystem name is not set')
+
+        param_value = f"osc.{fs_name}-OST*-osc-*.ost_conn_uuid"
+        args = [self.lctl, 'get_param', param_value]
+        output = subprocess.run(args, check=True, capture_output=True).stdout.decode('UTF-8')
+
+        for line in output.split('\n'):
+
+            stripped_line = line.strip()
+
+            if not stripped_line:
+                continue
+
+            match = LfsUtils._REGEX_PATTERN_OST_CONN_UUID.search(output)
+
+            if not match:
+                raise LfsUtilsError(f"No match for ost_conn_uuid on filesystem {fs_name}")
+
+            ost_idx = match.group(1)
+            ip_addr = match.group(2)
+
+            ost_conn_uuid_dict[ost_idx] = ip_addr
+
+        if not ost_conn_uuid_dict:
+            raise LfsUtilsError(f"Lustre ost_conn_uuid_dict is empty for filesystem {fs_name}")
+
+        return ost_conn_uuid_dict
 
     def lookup_ost_to_oss(self, fs_name: str, ost: int|str) -> str:
 
         hostname = ''
 
-        ost_hex = LfsUtils.to_ost_hex(ost)
-
-        param_value = f"osc.{fs_name}-OST{ost_hex}*.ost_conn_uuid"
-
-        args = [self.lctl, 'get_param', param_value]
-
-        result = subprocess.run(args, check=True, capture_output=True)
-
-        match = LfsUtils._REGEX_PATTERN_OST_CONN_UUID.search(result.stdout.decode('UTF-8'))
-
-        if not match:
-            raise LfsUtilsError(f"No match for ost_conn_uuid for OST {ost} on file system {fs_name}")
-
-        ip_addr = match.group(1)
-
+        ip_addr = self.ost_conn_uuid(fs_name, ost)
         host_info = socket.gethostbyaddr(ip_addr)
 
         if not host_info:
@@ -471,19 +513,9 @@ class LfsUtils:
         hostname = host_info[0]
 
         if not hostname:
-            raise LfsUtilsError(f"No hostname found for OST {ost} on file system {fs_name}")
+            raise LfsUtilsError(f"No hostname found for OST {ost} on filesystem {fs_name}")
 
         return hostname
-
-    def retrieve_ost_to_oss_map(self, fs_name: str) -> dict[str:str]:
-
-        param_value = f"osc.{fs_name}-OST*.ost_conn_uuid"
-
-        args = [self.lctl, 'get_param', param_value]
-
-        result = subprocess.run(args, check=True, capture_output=True)
-
-        TODO: Parse result and build map
 
     def is_ost_writable(self, ost: int, file_path: str) -> bool:
 

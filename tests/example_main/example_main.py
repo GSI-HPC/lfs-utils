@@ -86,7 +86,6 @@ def init_arg_parser():
 
     return parser.parse_args()
 
-
 def init_logging(log_file, enable_debug):
 
     if enable_debug:
@@ -98,7 +97,6 @@ def init_logging(log_file, enable_debug):
         logging.basicConfig(filename=log_file, level=log_level, format="%(asctime)s - %(levelname)s: %(message)s")
     else:
         logging.basicConfig(level=log_level, format="%(asctime)s - %(levelname)s: %(message)s")
-
 
 def main():
 
@@ -153,7 +151,6 @@ def main():
 
     except Exception:
         logging.exception('Caught exception in main function')
-
 
 if __name__ == '__main__':
     main()

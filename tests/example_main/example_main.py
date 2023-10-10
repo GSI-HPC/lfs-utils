@@ -24,6 +24,7 @@ import logging
 import sys
 import os
 
+from ClusterShell.RangeSet import RangeSet
 from minimal_python import MinimalPython
 
 def load_lfsutils_module_from_local_path():
@@ -42,7 +43,7 @@ def init_arg_parser():
                         dest='fs_name',
                         required=True,
                         type=str,
-                        help='Specify file system name')
+                        help='Specify filesystem name')
 
     parser.add_argument('-p',
                         '--fs-path',
@@ -50,7 +51,7 @@ def init_arg_parser():
                         required=False,
                         type=str,
                         default='/lustre',
-                        help='Specify file system path')
+                        help='Specify filesystem path')
 
     parser.add_argument('-t',
                         '--test-file',
@@ -119,17 +120,19 @@ def main():
         comp_states = lfs_utils.retrieve_component_states()
         fs_states = comp_states[fs_name]
 
-        logging.info(f"Count of MDTs: {len(fs_states.mdts)} - For file system: {fs_name}")
-        logging.info(f"Count of OSTs: {len(fs_states.osts)} - For file system: {fs_name}")
+        logging.info(f"Count of MDTs: {len(fs_states.mdts)} - For filesystem: {fs_name}")
+        logging.info(f"Count of OSTs: {len(fs_states.osts)} - For filesystem: {fs_name}")
 
-        logging.info(f"OST {ost_index} is active: {lfs_utils.is_ost_idx_active(fs_name, ost_index)} - On file system: {fs_name}")
+        logging.info(f"OST {ost_index} is active: {lfs_utils.is_ost_idx_active(fs_name, ost_index)} -"
+                     f"On filesystem: {fs_name}")
 
         logging.info(f"OST {ost_index} is writable: {lfs_utils.is_ost_writable(ost_index, test_file)}")
 
         lfs_utils.set_ost_file_stripe(test_file, ost_index)
 
         stripe_info = lfs_utils.stripe_info(test_file)
-        logging.info(f"Stripe info for file: {stripe_info.filename} - OST index: {stripe_info.index} - Stripe count: {stripe_info.count}")
+        logging.info(f"Stripe info for file: {stripe_info.filename} - "
+                     f"OST index: {stripe_info.index} - Stripe count: {stripe_info.count}")
 
         logging.info(lfs_utils.migrate_file(test_file, ost_index, 0))
 
@@ -137,10 +140,12 @@ def main():
 
         logging.info(f"Size of OST fill level items: {len(lfs_utils.retrieve_ost_disk_usage(fs_path))}")
 
-        logging.info(f"Hostname for OST {ost_index} on file system {fs_name}: {lfs_utils.lookup_ost_to_oss(fs_name, ost_index)}")
+        logging.info(f"Hostname for OST {ost_index} on filesystem {fs_name}: "
+                     f"{lfs_utils.lookup_oss_by_ost(fs_name, ost_index)}")
 
-        # TODO: add debug message
-        lfs_utils.lookup_ost_rangeset_to_oss(fs_name, "0-9,12,87")
+        ost_rangeset = "0-9,12,87"
+        logging.info(f"Using OST RangeSet ({ost_rangeset}) for lookup to OSS "
+                     f"{lfs_utils.lookup_oss_by_ost_rangeset(fs_name, RangeSet(ost_rangeset))}")
 
         logging.info('Finished')
 

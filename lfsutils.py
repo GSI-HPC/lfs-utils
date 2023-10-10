@@ -28,7 +28,7 @@ import socket
 import subprocess
 import yaml
 
-from ClusterShell.RangeSet import RangeSet
+import ClusterShell.RangeSet
 
 def conv_obj(arg: int|str|None) -> str:
     """Support convertion from int, str and None objects to str.
@@ -191,6 +191,7 @@ class LfsUtils:
         self.lctl = lctl
 
     # TODO: Write pydoc
+    # global function?
     def to_ost_hex(ost: int|str) -> str:
 
         if isinstance(ost, str):
@@ -468,7 +469,7 @@ class LfsUtils:
 
     def ost_conn_uuid_map(self, fs_name: str) -> Dict[str, str]:
 
-        ost_conn_uuid_dict = {}
+        ost_conn_uuid_dict : Dict[str, str] = {}
 
         if not fs_name:
             raise LfsUtilsError('Lustre filesystem name is not set')
@@ -499,9 +500,10 @@ class LfsUtils:
 
         return ost_conn_uuid_dict
 
-    def resolve_ost_conn_uid(fs_name: str, ost_conn_uuid: str) -> str:
+    def resolve_oss_name(self, ost_conn_uuid: str) -> str:
 
-        # TODO: check for input arg not empty
+        if not ost_conn_uuid:
+            raise RuntimeError(f"Parameter ost_conn_uuid is empty")
 
         host_info = socket.gethostbyaddr(ost_conn_uuid)
 
@@ -514,20 +516,23 @@ class LfsUtils:
         hostname = host_info[0]
 
         if not hostname:
-            raise LfsUtilsError(f"No hostname found for ost_conn_uuid {ost_conn_uuid} on filesystem {fs_name}")
+            raise LfsUtilsError(f"No hostname found for ost_conn_uuid {ost_conn_uuid}")
 
         return hostname
 
-    def lookup_ost_to_oss(self, fs_name: str, ost: int|str) -> str:
-        return LfsUtils.resolve_ost_conn_uid(fs_name, self.ost_conn_uuid(fs_name, ost))
+    def lookup_oss_by_ost(self, fs_name: str, ost: int|str) -> str:
+        return self.resolve_oss_name(self.ost_conn_uuid(fs_name, ost))
 
-    def lookup_ost_rangeset_to_oss(self, fs_name: str, ost_rangeset: str) -> Dict[str, str]:
+    def lookup_oss_by_ost_rangeset(self, fs_name: str, ost_rangeset: ClusterShell.RangeSet) -> Dict[str, str]:
 
-        ost_conn_uuids = self.ost_conn_uuid_map(fs_name)
+        ost_oss_dict : Dict[str, str] = {}
 
-        # for ost_dec in RangeSet(ost_rangeset).striter():
+        ost_conn_uuids : Dict[str:str] = self.ost_conn_uuid_map(fs_name)
 
-        #     ost_conn_uuid_map[LfsUtils.to_ost_hex(int(ost_dec))]
+        for ost in ost_rangeset.striter():
+            ost_oss_dict[ost] = self.resolve_oss_name(ost_conn_uuids[LfsUtils.to_ost_hex(int(ost))])
+
+        return ost_oss_dict
 
     def is_ost_writable(self, ost: int, file_path: str) -> bool:
 

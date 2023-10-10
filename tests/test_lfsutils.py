@@ -71,14 +71,13 @@ class TestLfsUtils(unittest.TestCase):
 
     def test_to_ost_hex(self):
 
-        self.assertEqual(LfsUtils.to_ost_hex('001a'), '001a')
-        self.assertEqual(LfsUtils.to_ost_hex(12), '000c')
-
-        with self.assertRaises(RuntimeError):
-            LfsUtils.to_ost_hex('45')
+        self.assertEqual(lfsutils.to_ost_hex(12), '000c')
 
         with self.assertRaises(TypeError):
-            LfsUtils.to_ost_hex(67.32)
+            lfsutils.to_ost_hex('45')
+
+        with self.assertRaises(TypeError):
+            lfsutils.to_ost_hex(67.32)
 
 class TestLfsUtilsMigration(unittest.TestCase):
 

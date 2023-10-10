@@ -24,7 +24,9 @@ import logging
 import sys
 import os
 
+from ClusterShell.NodeSet import NodeSet
 from ClusterShell.RangeSet import RangeSet
+
 from minimal_python import MinimalPython
 
 def load_lfsutils_module_from_local_path():
@@ -143,9 +145,9 @@ def main():
         logging.info(f"Hostname for OST {ost_index} on filesystem {fs_name}: "
                      f"{lfs_utils.lookup_oss_by_ost(fs_name, ost_index)}")
 
-        ost_rangeset = "0-9,12,87"
+        ost_rangeset: RangeSet = RangeSet("0-9,12,87")
         logging.info(f"Using OST RangeSet ({ost_rangeset}) for lookup to OSS "
-                     f"{lfs_utils.lookup_oss_by_ost_rangeset(fs_name, RangeSet(ost_rangeset))}")
+                     f"{lfs_utils.lookup_oss_by_ost_rangeset(fs_name, ost_rangeset)}")
 
         logging.info('Finished')
 

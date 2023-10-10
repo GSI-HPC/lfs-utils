@@ -28,10 +28,12 @@ import socket
 import subprocess
 import yaml
 
+import ClusterShell.NodeSet
 import ClusterShell.RangeSet
 
 def conv_obj(arg: int|str|None) -> str:
-    """Support convertion from int, str and None objects to str.
+    """
+    Support convertion from int, str and None objects to str.
 
     None objects are converted to empty string.
     """
@@ -45,8 +47,16 @@ def conv_obj(arg: int|str|None) -> str:
 
     raise TypeError(f"Argument of type {type(arg)} not supported")
 
+def to_ost_hex(ost: int) -> str:
+    """Convert a decimal to hexadecimal number with 4 digits (OST formatted e.g. 001c)"""
+
+    if ost < LfsUtils.MIN_OST_INDEX or ost > LfsUtils.MAX_OST_INDEX:
+        raise LfsUtilsError(f"OST index {ost} invalid. Must be in range between {LfsUtils.MIN_OST_INDEX} and {LfsUtils.MAX_OST_INDEX}.")
+
+    return hex(ost).split('x')[-1].zfill(4)
+
 class LfsUtilsError(Exception):
-    """Exception class LfsUtils specific errors."""
+    """Exception class LfsUtils specific errors"""
 
 class LfsComponentType(str, Enum):
 
@@ -190,32 +200,6 @@ class LfsUtils:
         self.lfs = lfs
         self.lctl = lctl
 
-    # TODO: Write pydoc
-    # global function?
-    def to_ost_hex(ost: int|str) -> str:
-
-        if isinstance(ost, str):
-
-            match = LfsUtils._REGEX_PATTERN_OST_HEX.match(ost)
-
-            if not match:
-                raise RuntimeError(f"Value for hex OST is invalid: '{ost}'")
-
-            return ost
-
-        elif isinstance(ost, int):
-
-            number = int(ost)
-
-            if number < LfsUtils.MIN_OST_INDEX or number > LfsUtils.MAX_OST_INDEX:
-                raise LfsUtilsError(f"OST index {number} invalid. Must be in range between {LfsUtils.MIN_OST_INDEX} and {LfsUtils.MAX_OST_INDEX}.")
-
-            return hex(number).split('x')[-1].zfill(4)
-
-        else:
-            raise TypeError(f"Unsupported type found{type(ost)} - Must be of type int or str for OST index.")
-
-
     def retrieve_component_states(self, file: str = None) -> Dict[str, LfsComponentCollection]:
 
         comp_states = dict[str, LfsComponentCollection]()
@@ -287,7 +271,7 @@ class LfsUtils:
         Raises
         ------
         LfsUtilsError
-            * If a field is not found in retrieved stripe info for given file.
+            * If a field is not found in received stripe info for given file.
             * If execution of 'lfs getstripe' returns an error.
 
         subprocess.CalledProcessError on lfs getstripe.
@@ -451,7 +435,7 @@ class LfsUtils:
         if not fs_name:
             raise LfsUtilsError('Lustre filesystem name is not set')
 
-        param_value = f"osc.{fs_name}-OST{LfsUtils.to_ost_hex(ost)}-osc-*.ost_conn_uuid"
+        param_value = f"osc.{fs_name}-OST{to_ost_hex(ost)}-osc-*.ost_conn_uuid"
         args = [self.lctl, 'get_param', param_value]
         output = subprocess.run(args, check=True, capture_output=True).stdout.decode('UTF-8')
 
@@ -467,9 +451,9 @@ class LfsUtils:
 
         return conn_uuid
 
-    def ost_conn_uuid_map(self, fs_name: str) -> Dict[str, str]:
+    def ost_conn_uuid_map(self, fs_name: str) -> Dict[int, str]:
 
-        ost_conn_uuid_dict : Dict[str, str] = {}
+        ost_conn_uuid_dict : Dict[int, str] = {}
 
         if not fs_name:
             raise LfsUtilsError('Lustre filesystem name is not set')
@@ -490,7 +474,7 @@ class LfsUtils:
             if not match:
                 raise LfsUtilsError(f"No match for ost_conn_uuid on filesystem {fs_name}")
 
-            ost_idx = match.group(1)
+            ost_idx = int(match.group(1), 16)
             ip_addr = match.group(2)
 
             ost_conn_uuid_dict[ost_idx] = ip_addr
@@ -500,15 +484,15 @@ class LfsUtils:
 
         return ost_conn_uuid_dict
 
-    def resolve_oss_name(self, ost_conn_uuid: str) -> str:
+    def resolve_hostname(self, addr: str) -> str:
 
-        if not ost_conn_uuid:
-            raise RuntimeError(f"Parameter ost_conn_uuid is empty")
+        if not addr:
+            raise RuntimeError(f"Parameter addr is empty")
 
-        host_info = socket.gethostbyaddr(ost_conn_uuid)
+        host_info = socket.gethostbyaddr(addr)
 
         if not host_info:
-            raise LfsUtilsError(f"No host information retrieved from socket.gethostbyaddr() for IP addr {ost_conn_uuid}")
+            raise LfsUtilsError(f"No host information received from socket.gethostbyaddr() for IP address {addr}")
 
         if len(host_info) != 3:
             raise LfsUtilsError(f"Broken interface for value {host_info} on socket.gethostbyaddr()")
@@ -516,23 +500,49 @@ class LfsUtils:
         hostname = host_info[0]
 
         if not hostname:
-            raise LfsUtilsError(f"No hostname found for ost_conn_uuid {ost_conn_uuid}")
+            raise LfsUtilsError(f"No hostname found for IP address {addr}")
 
         return hostname
 
+    def resolve_addr(self, hostname: str) -> str:
+
+        if not hostname:
+            raise RuntimeError(f"Parameter hostname is empty")
+
+        addr = socket.gethostbyname(hostname)
+
+        if not addr:
+            raise LfsUtilsError(f"No IP address received from socket.gethostbyname() for hostname {hostname}")
+
+        return addr
+
     def lookup_oss_by_ost(self, fs_name: str, ost: int|str) -> str:
-        return self.resolve_oss_name(self.ost_conn_uuid(fs_name, ost))
+        return self.resolve_hostname(self.ost_conn_uuid(fs_name, ost))
 
-    def lookup_oss_by_ost_rangeset(self, fs_name: str, ost_rangeset: ClusterShell.RangeSet) -> Dict[str, str]:
+    def lookup_oss_by_ost_rangeset(self, fs_name: str, rangeset: ClusterShell.RangeSet) -> Dict[int, str]:
 
-        ost_oss_dict : Dict[str, str] = {}
+        ost_oss_dict : Dict[int, str] = {}
 
-        ost_conn_uuids : Dict[str:str] = self.ost_conn_uuid_map(fs_name)
+        ost_conn_uuids : Dict[int:str] = self.ost_conn_uuid_map(fs_name)
 
-        for ost in ost_rangeset.striter():
-            ost_oss_dict[ost] = self.resolve_oss_name(ost_conn_uuids[LfsUtils.to_ost_hex(int(ost))])
+        for ost in rangeset.intiter():
+            # TODO: GitHub issue?
+            dec_ost = int(ost)  # no RangeSet.intiter() found!
+            ost_oss_dict[dec_ost] = self.resolve_hostname(ost_conn_uuids[dec_ost])
 
         return ost_oss_dict
+
+    def lookup_ost_by_oss_nodeset(self, fs_name: str, nodeset: ClusterShell.NodeSet) -> Dict[str, list[int]]:
+
+        oss_with_ost_list : Dict[str, list[int]] = {}
+
+        ost_conn_uuids : Dict[int:str] = self.ost_conn_uuid_map(fs_name)
+
+        for node in nodeset:
+            oss_with_ost_list[node] = \
+            [ost for ost, conn_uuid in ost_conn_uuids.items() if conn_uuid == self.resolve_addr(node)]
+
+        return oss_with_ost_list
 
     def is_ost_writable(self, ost: int, file_path: str) -> bool:
 

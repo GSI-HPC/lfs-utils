@@ -519,18 +519,22 @@ class LfsUtils:
     def lookup_oss_by_ost(self, fs_name: str, ost: int|str) -> str:
         return self.resolve_hostname(self.ost_conn_uuid(fs_name, ost))
 
-    def lookup_oss_by_ost_rangeset(self, fs_name: str, rangeset: ClusterShell.RangeSet) -> Dict[int, str]:
+    def lookup_oss_by_ost_rangeset(self, fs_name: str, rangeset: ClusterShell.RangeSet) -> Dict[str, list[int]]:
 
-        ost_oss_dict : Dict[int, str] = {}
+        oss_with_ost_list : Dict[str, list[int]] = {}
 
         ost_conn_uuids : Dict[int:str] = self.ost_conn_uuid_map(fs_name)
 
         for ost in rangeset.intiter():
-            # TODO: GitHub issue?
-            dec_ost = int(ost)  # no RangeSet.intiter() found!
-            ost_oss_dict[dec_ost] = self.resolve_hostname(ost_conn_uuids[dec_ost])
 
-        return ost_oss_dict
+            oss = self.resolve_hostname(ost_conn_uuids[ost])
+
+            if not oss in oss_with_ost_list:
+                oss_with_ost_list[oss] = list[int]()
+
+            oss_with_ost_list[oss].append(ost)
+
+        return oss_with_ost_list
 
     def lookup_ost_by_oss_nodeset(self, fs_name: str, nodeset: ClusterShell.NodeSet) -> Dict[str, list[int]]:
 
@@ -540,7 +544,7 @@ class LfsUtils:
 
         for node in nodeset:
             oss_with_ost_list[node] = \
-            [ost for ost, conn_uuid in ost_conn_uuids.items() if conn_uuid == self.resolve_addr(node)]
+                [ost for ost, conn_uuid in ost_conn_uuids.items() if conn_uuid == self.resolve_addr(node)]
 
         return oss_with_ost_list
 

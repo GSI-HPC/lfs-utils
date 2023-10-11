@@ -1,15 +1,15 @@
 [project]
 name = "lfsutils"
-version = "1.0.2"
+version = "1.0.2.2"
 authors = [
   { name="Gabriele Iannetti", email="g.iannetti@gsi.de" },
 ]
-description = "A Utility Library for the Lustre filesystem"
+description = "A Utility Library and CLI Tool for the Lustre filesystem"
 license = "GPL-3.0"
 readme = "README.md"
 requires-python = ">=3.10.0"
 dependencies = [
-  "ClusterShell>=1.9.2",
+  "ClusterShell>=1.8.4",
   "PyYAML>=5.4.1",
 ]
 keywords = ["lustre", "utility"]
@@ -25,6 +25,10 @@ classifiers = [
 Homepage = "https://github.com/GSI-HPC/lfs-utils"
 Repository = "https://github.com/GSI-HPC/lfs-utils"
 
+[project.scripts]
+lfsutils-cli = "CLI.lfsutils-cli:main"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+

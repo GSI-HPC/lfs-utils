@@ -1,6 +1,6 @@
 # lfs-utils
 
-A utility library for the [Lustre](https://www.lustre.org/) filesystem
+A utility library and CLI tool for the [Lustre](https://www.lustre.org/) filesystem
 
 ## Installation
 

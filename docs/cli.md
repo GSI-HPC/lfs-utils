@@ -1,4 +1,8 @@
-# lfsutils-cli
+# lfs-utils CLI Tool
+
+## Command
+
+`lfsutils-cli`
 
 ## Sub-Commands
 
@@ -10,8 +14,8 @@
 #### Help
 
 ```bash
-./lfsutils-cli.py oss -h
-usage: lfsutils-cli.py oss [-h] [-D] fsname rangeset
+./lfsutils-cli oss -h
+usage: lfsutils-cli oss [-h] [-D] fsname rangeset
 
 Lookup OSS by specifying an OST RangeSet
 
@@ -27,7 +31,7 @@ options:
 #### Example
 
 ```bash
-./lfsutils-cli.py oss hebe "30-50,100-120"
+./lfsutils-cli oss hebe "30-50,100-120"
 oss001.domain.de - [30, 31, 32, 33, 34]
 oss003.domain.de - [35, 36, 37, 38, 39, 40, 41]
 oss005.domain.de - [42, 43, 44, 45, 46, 47, 48]
@@ -43,8 +47,8 @@ oss155.domain.de - [119, 120]
 #### Help
 
 ```bash
-./lfsutils-cli.py ost -h
-usage: lfsutils-cli.py ost [-h] [-D] fsname nodeset
+./lfsutils-cli ost -h
+usage: lfsutils-cli ost [-h] [-D] fsname nodeset
 
 Lookup OST by specifying an OSS NodeSet
 
@@ -60,7 +64,7 @@ options:
 #### Example
 
 ```bash
-./lfsutils-cli.py ost hebe "oss[445-448,450].domain.de"
+./lfsutils-cli ost hebe "oss[445-448,450].domain.de"
 oss445.domain.de - [210, 211, 212, 213, 214, 215, 216]
 oss446.domain.de - [217, 218, 219, 220, 221, 222, 223]
 oss447.domain.de - [224, 225, 226, 227, 228, 229, 230]

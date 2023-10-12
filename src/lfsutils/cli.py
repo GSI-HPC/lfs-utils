@@ -17,26 +17,18 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from pathlib import PurePosixPath
-
 import argparse
 import logging
-import sys
-import os
 
 from ClusterShell.NodeSet import NodeSet
 from ClusterShell.RangeSet import RangeSet
 
-# TODO Remove after development and testing
-def load_lfsutils_module_from_local_path():
-    sys.path.append(PurePosixPath(os.path.dirname(os.path.realpath(__file__))).parents[1].as_posix())
-
-load_lfsutils_module_from_local_path()
-from lfsutils import LfsUtils
+from lfsutils.lib import LfsUtils
 
 def init_arg_parser():
 
     parser = argparse.ArgumentParser(description='LFSUtils CLI Tool')
+    parser.add_argument('-D', '--debug', dest='debug', required=False, action='store_true', help='Enable debug')
 
     subparsers = parser.add_subparsers(dest='sub_command', help='sub-command help')
 

@@ -18,19 +18,20 @@
 #
 
 from datetime import timedelta
-from pathlib import PurePosixPath
 
-import sys
-import os
 import unittest
 
 def load_lfsutils_module_from_local_path():
-    sys.path.append(PurePosixPath(os.path.dirname(os.path.realpath(__file__))).parents[0].as_posix())
+
+    from pathlib import PurePosixPath
+    import sys, os
+
+    sys.path.append(f"{PurePosixPath(os.path.dirname(os.path.realpath(__file__))).parents[0].as_posix()}/src/")
 
 load_lfsutils_module_from_local_path()
 
-from lfsutils import LfsUtils, LfsUtilsError, MigrateResult, MigrateState
-import lfsutils
+from lfsutils.lib import LfsUtils, LfsUtilsError, MigrateResult, MigrateState
+import lfsutils.lib as lfsutils
 
 class TestLfsUtils(unittest.TestCase):
 

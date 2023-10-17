@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# Copyright 2023 Gabriele Iannetti <g.iannetti@gsi.de>
+# Copyright 2023 GSI Helmholtz Centre for Heavy Ion Research
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by

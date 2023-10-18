@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# Copyright 2022 Gabriele Iannetti <g.iannetti@gsi.de>
+# Copyright 2022 GSI Helmholtz Centre for Heavy Ion Research
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,7 +15,6 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-#
 
 from datetime import timedelta
 
@@ -79,6 +78,9 @@ class TestLfsUtils(unittest.TestCase):
 
         with self.assertRaises(TypeError):
             lfsutils.to_ost_hex(67.32)
+
+    def test_create_rangeset_from_hex(self):
+        self.assertEqual(str(lfsutils.create_rangeset_from_hex('0000, 00FF, ff00-FF10, dd23')), '0,255,56611,65280-65296')
 
 class TestLfsUtilsMigration(unittest.TestCase):
 

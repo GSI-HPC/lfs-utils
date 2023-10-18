@@ -10,7 +10,7 @@
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
@@ -31,10 +31,11 @@ import yaml
 import ClusterShell.NodeSet
 import ClusterShell.RangeSet
 
+_REGEX_OST_HEX = re.compile(r"([0-9a-fA-F]{4})")
+
 def conv_obj(arg: int|str|None) -> str:
     """
     Support convertion from int, str and None objects to str.
-
     None objects are converted to empty string.
     """
 
@@ -48,15 +49,22 @@ def conv_obj(arg: int|str|None) -> str:
     raise TypeError(f"Argument of type {type(arg)} not supported")
 
 def to_ost_hex(ost: int) -> str:
-    """Convert a decimal to hexadecimal number with 4 digits (OST formatted e.g. 001c)"""
+    "Convert a decimal to hexadecimal number with 4 digits (OST formatted e.g. 001c)"
 
     if ost < LfsUtils.MIN_OST_INDEX or ost > LfsUtils.MAX_OST_INDEX:
         raise LfsUtilsError(f"OST index {ost} invalid. Must be in range between {LfsUtils.MIN_OST_INDEX} and {LfsUtils.MAX_OST_INDEX}.")
 
     return hex(ost).split('x')[-1].zfill(4)
 
+def _replace_regex_match_hex_to_dec(match: re.Match) -> str:
+    "Return the decimal number for a hex string within a regex match"
+    return str(int(match.group(), 16))
+
+def create_rangeset_from_hex(hex_def: str) -> ClusterShell.RangeSet:
+    return ClusterShell.RangeSet.RangeSet(_REGEX_OST_HEX.sub(_replace_regex_match_hex_to_dec, hex_def))
+
 class LfsUtilsError(Exception):
-    """Exception class LfsUtils specific errors"""
+    "Exception class LfsUtils specific errors"
 
 class LfsComponentType(str, Enum):
 
@@ -125,7 +133,7 @@ class MigrateState(str, Enum):
         return self.value
 
 class MigrateResult:
-    '''
+    """
     Format per result:
     * DISPLACED|filename|time_elapsed|source_index|target_index
       - if file was migrated successfully, but ost target index is different
@@ -138,7 +146,7 @@ class MigrateResult:
       - if skip option enabled and file stripe count > 1
     * SUCCESS|filename|time_elapsed|source_index|target_index
       - if migration of file was successful
-    '''
+    """
 
     def __init__(self,
                  state: MigrateState,
@@ -183,14 +191,13 @@ class MigrateResult:
 
 class LfsUtils:
 
-    _REGEX_STR_OST_HEX = r"^[0-9a-fA-F]{4}$"
-    _REGEX_STR_COMP_STATE = r"(.+)\-((OST|MDT){1}[a-z0-9]+)\-[a-z0-9-]+\s(.+)\."
+    _REGEX_STR_LFS_COMP_STATE = r"(.+)\-((OST|MDT){1}[a-z0-9]+)\-[a-z0-9-]+\s(.+)\."
     _REGEX_STR_OST_FILL_LEVEL = r"(\d{1,3})%.*\[OST:([0-9]{1,4})\]"
-    _REGEX_STR_OST_CONN_UUID = r"osc\..*-OST([0-9a-fA-F]{4})-osc-[0-9a-fA-F]{16}\.ost_conn_uuid=([\d\.]+)@"
+    _REGEX_STR_OST_CONN_UUID  = r"osc\..*-OST([0-9a-fA-F]{4})-osc-[0-9a-fA-F]{16}\.ost_conn_uuid=([\d\.]+)@"
 
-    _REGEX_PATTERN_OST_HEX = re.compile(_REGEX_STR_OST_HEX)
+    _REGEX_PATTERN_LFS_COMP_STATE = re.compile(_REGEX_STR_LFS_COMP_STATE)
     _REGEX_PATTERN_OST_FILL_LEVEL = re.compile(_REGEX_STR_OST_FILL_LEVEL)
-    _REGEX_PATTERN_OST_CONN_UUID = re.compile(_REGEX_STR_OST_CONN_UUID)
+    _REGEX_PATTERN_OST_CONN_UUID  = re.compile(_REGEX_STR_OST_CONN_UUID)
 
     MIN_OST_INDEX = 0
     MAX_OST_INDEX = 65535
@@ -211,8 +218,7 @@ class LfsUtils:
             args = ['sudo', self.lfs, 'check', 'osts']
             output = subprocess.run(args, check=True, capture_output=True).stdout.decode('UTF-8')
 
-        logging.debug("Using regex for `lfs check osts`: %s", LfsUtils._REGEX_STR_COMP_STATE)
-        pattern = re.compile(LfsUtils._REGEX_STR_COMP_STATE)
+        logging.debug("Using regex for `lfs check osts`: %s", LfsUtils._REGEX_STR_LFS_COMP_STATE)
 
         for line in output.split('\n'):
 
@@ -221,7 +227,7 @@ class LfsUtils:
             if not stripped_line:
                 continue
 
-            match = pattern.match(stripped_line)
+            match = LfsUtils._REGEX_PATTERN_LFS_COMP_STATE.match(stripped_line)
 
             if match:
 

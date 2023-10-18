@@ -24,6 +24,8 @@ from ClusterShell.RangeSet import RangeSet
 
 from lfsutils.lib import LfsUtils
 
+import lfsutils.lib
+
 def init_arg_parser():
 
     parser = argparse.ArgumentParser(description='LFSUtils CLI Tool')
@@ -34,7 +36,8 @@ def init_arg_parser():
     parser_oss = subparsers.add_parser(name='oss', description='Lookup OSS by specifying an OST RangeSet', help='OSS lookup by OST RangeSet')
     parser_oss.add_argument('-D', '--debug', dest='debug', required=False, action='store_true', help='Enable debug')
     parser_oss.add_argument('fsname', type=str, help='Filesystem name')
-    parser_oss.add_argument('rangeset', type=str, help='RangeSet with OST indexes e.g. \"30-50,100-120\"')
+    parser_oss.add_argument('rangeset', type=str, help='RangeSet with OST decimal indexes e.g. "30-50,100-120". For hexadecimal see -x/--hex option.')
+    parser_oss.add_argument('-x', '--hex', dest='hex', required=False, default=False, action='store_true', help='Enable hexadecimal rangeset specification for OSTs e.g. \"0000, 00D6-00F1, 00FF-01A0\"')
 
     parser_ost = subparsers.add_parser(name='ost', description='Lookup OST by specifying an OSS NodeSet', help='OST lookup by OSS NodeSet')
     parser_ost.add_argument('-D', '--debug', dest='debug', required=False, action='store_true', help='Enable debug')
@@ -66,7 +69,10 @@ def main():
 
         if args.sub_command == 'oss':
 
-            rangeset: RangeSet = RangeSet(args.rangeset)
+            if args.hex:
+                rangeset: RangeSet = lfsutils.lib.create_rangeset_from_hex(args.rangeset)
+            else:
+                rangeset: RangeSet = RangeSet(args.rangeset)
 
             logging.debug("Lookup OSS by OST RangeSet %s", rangeset)
 

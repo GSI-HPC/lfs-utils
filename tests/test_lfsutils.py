@@ -72,7 +72,9 @@ class TestLfsUtils(unittest.TestCase):
             lfsutils.to_ost_hex(67.32)
 
     def test_create_rangeset_from_hex(self):
-        self.assertEqual(str(lfsutils.create_rangeset_from_hex('0000, 00FF, ff00-FF10, dd23')), '0,255,56611,65280-65296')
+        self.assertEqual(
+            str(lfsutils.create_rangeset_from_hex('0000, 00FF, ff00-FF10, dd23')),
+            '0,255,56611,65280-65296')
 
 class TestLfsUtilsMigration(unittest.TestCase):
 

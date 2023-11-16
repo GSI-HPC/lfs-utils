@@ -53,6 +53,18 @@ def _replace_regex_match_hex_to_dec(match: re.Match) -> str:
     return str(int(match.group(), 16))
 
 def create_rangeset_from_hex(hex_def: str) -> ClusterShell.RangeSet:
+    """
+    Convert a given hex argument which matches regex format [0-9a-fA-F]{4} to a RangeSet.
+
+    Raises
+    ------
+    ClusterShell.RangeSet.RangeSetParseError
+        If convertion of given argument failed to RangeSet.
+
+    Returns
+    -------
+    ClusterShell.RangeSet
+    """
     return ClusterShell.RangeSet.RangeSet(_REGEX_OST_HEX.sub(_replace_regex_match_hex_to_dec, hex_def))
 
 class LfsUtilsError(Exception):
@@ -276,7 +288,7 @@ class LfsUtils:
 
         Returns
         -------
-        A StripeInfo object.
+        A StripeInfo object
         """
 
         if file:

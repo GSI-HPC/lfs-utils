@@ -6,10 +6,11 @@
 
 ## Sub-Commands
 
-* oss - Lookup OSS with NodeSet
-* ost - Lookup OST with RangeSet
+* oss - Lookup OSS by specifiying OSTs in ClusterShell [RangeSet](https://clustershell.readthedocs.io/en/latest/api/NodeSet.html) notation
 
-### oss - Lookup OSS with NodeSet
+* ost - Lookup OSTs by specifiying OSS in ClusterShell [NodeSet](https://clustershell.readthedocs.io/en/latest/api/RangeSet.html) notation
+
+### oss - Lookup OSS with OST RangeSet
 
 #### Help
 
@@ -57,7 +58,7 @@ oss503.domain.de - [770, 771, 772, 773, 774, 775, 776]
 oss504.domain.de - [777, 778, 779, 780, 781, 782, 783]
 ```
 
-### ost - Lookup OST with RangeSet
+### ost - Lookup OST with OSS NodeSet
 
 #### Help
 

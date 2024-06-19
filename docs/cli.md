@@ -15,7 +15,7 @@
 #### Help
 
 ```bash
-./lfsutils-cli oss -h
+$ lfsutils-cli oss -h
 usage: lfsutils-cli oss [-h] [-D] fsname rangeset
 
 Lookup OSS by specifying an OST RangeSet
@@ -33,7 +33,7 @@ options:
 #### Example with OST decimal RangeSet
 
 ```bash
-./lfsutils-cli oss fsname "30-50,100-120"
+$ lfsutils-cli oss fsname "30-50,100-120"
 oss001.domain.de - [30, 31, 32, 33, 34]
 oss003.domain.de - [35, 36, 37, 38, 39, 40, 41]
 oss005.domain.de - [42, 43, 44, 45, 46, 47, 48]
@@ -47,7 +47,7 @@ oss155.domain.de - [119, 120]
 #### Example with OST hexadecimal RangeSet
 
 ```bash
-./lfsutils-cli oss fsname "0000, 0010-0020,02f7-030f" -x
+$ lfsutils-cli oss fsname "0000, 0010-0020,02f7-030f" -x
 oss505.domain.de - [0]
 oss507.domain.de - [16, 17, 18, 19, 20]
 oss508.domain.de - [21, 22, 23, 24, 25, 26, 27]
@@ -63,7 +63,7 @@ oss504.domain.de - [777, 778, 779, 780, 781, 782, 783]
 #### Help
 
 ```bash
-./lfsutils-cli ost -h
+$ lfsutils-cli ost -h
 usage: lfsutils-cli ost [-h] [-D] fsname nodeset
 
 Lookup OST by specifying an OSS NodeSet
@@ -80,7 +80,7 @@ options:
 #### Example
 
 ```bash
-./lfsutils-cli ost fsname "oss[445-448,450].domain.de"
+$ lfsutils-cli ost fsname "oss[445-448,450].domain.de"
 oss445.domain.de - [210, 211, 212, 213, 214, 215, 216]
 oss446.domain.de - [217, 218, 219, 220, 221, 222, 223]
 oss447.domain.de - [224, 225, 226, 227, 228, 229, 230]

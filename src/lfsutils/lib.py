@@ -140,7 +140,7 @@ class MigrateResult:
     """
     Format per result:
     * DISPLACED|filename|time_elapsed|source_index|target_index
-      - if file was migrated successfully, but ost target index is different
+      - if file has already been moved e.g. outside of the migration call
     * FAILED|filename|time_elapsed|source_index|target_index|error_message
       - if migration process failed for file
     * IGNORED|filename
